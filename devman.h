@@ -1,7 +1,7 @@
 #pragma once
 
 #include <cuda.h>
-#include <string>
+#include <cstring>
 #include <vector>
 #include <map>
 
@@ -74,7 +74,7 @@ struct Device {
 	DeviceBuffer* getBuffer(std::string name) {
 		DeviceBuffer* res = nullptr;
 
-		auto& it = buffers.find(name);
+		const auto& it = buffers.find(name);
 		if (it == buffers.end()) {
 			res = new DeviceBuffer(name, context, emulate);
 			buffers[name] = res;
@@ -89,8 +89,8 @@ struct Device {
 		std::string name;                  //< Name of the device as returned by the CUDA API
 		size_t memory;                     //< Total memory in bytes
 		size_t sharedMemPerBlock;          //< Total shared memory per block in bytes
-		int major;                         //< CUDA Compute Capability major version number
-		int minor;                         //< CUDA Compute Capability minor version number
+		int ccmajor;                       //< CUDA Compute Capability major version number
+		int ccminor;                       //< CUDA Compute Capability minor version number
 		int warpSize;                      //< Number of threads in a warp. Most probably 32
 		int multiProcessorCount;           //< Number of SMs in the GPU
 		int maxThreadsPerBlock;            //< Maximum number of threads that can work concurrently in a block
@@ -104,8 +104,8 @@ struct Device {
 			name("Unknown"),
 			memory(0),
 			sharedMemPerBlock(0),
-			major(-1),
-			minor(-1),
+			ccmajor(-1),
+			ccminor(-1),
 			warpSize(-1),
 			multiProcessorCount(-1),
 			maxThreadsPerBlock(-1),
@@ -216,7 +216,7 @@ struct ThreadData {
 	DeviceBuffer* getBuffer(std::string name) {
 		DeviceBuffer* res = nullptr;
 
-		auto& it = buffers.find(name);
+		const auto& it = buffers.find(name);
 		if (it == buffers.end()) {
 			res = new DeviceBuffer(name, device->context, device->isEmulator());
 			buffers[name] = res;

@@ -102,7 +102,7 @@ int DeviceManager::getDeviceInfo(int deviceIndex, Device &devInfo) {
 	GPUResult err = GPU_SUCCESS;
 
 	devInfo.params.devId = deviceIndex;
-	CUdevice device = NULL;
+	CUdevice device = 0;
 	err = cuDeviceGet(&device, deviceIndex);
 	checkError(err);
 	devInfo.handle = device;
@@ -127,12 +127,12 @@ int DeviceManager::getDeviceInfo(int deviceIndex, Device &devInfo) {
 	attrib = CUdevice_attribute::CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MAJOR;
 	err = cuDeviceGetAttribute(&value, attrib, device);
 	checkError(err);
-	devInfo.params.major = value;
+	devInfo.params.ccmajor = value;
 
 	attrib = CUdevice_attribute::CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MINOR;
 	err = cuDeviceGetAttribute(&value, attrib, device);
 	checkError(err);
-	devInfo.params.minor = value;
+	devInfo.params.ccminor = value;
 
 	attrib = CUdevice_attribute::CU_DEVICE_ATTRIBUTE_MAX_THREADS_PER_MULTIPROCESSOR;
 	err = cuDeviceGetAttribute(&value, attrib, device);
@@ -218,7 +218,7 @@ int DeviceBuffer::free() {
 	
 	if (buffer) {
 		if (emulate) {
-			delete [] buffer;
+			delete [] static_cast<char*>(buffer);
 		} else {
 			err = cuMemFree((CUdeviceptr)buffer);
 		}
@@ -287,17 +287,18 @@ std::string Device::getInfo() const {
 	const float totalMemory = float(params.memory) / float(1024 * 1024 * 1024);
 	const float sharedMemory = float(params.sharedMemPerBlock) / float(1024);
 
-	char buff[1024];
-	sprintf_s(buff, "Device[%d] is : %s\n\n", params.devId, params.name.c_str()); message += buff;
-	sprintf_s(buff, "\tDriver mode                    : %s\n", params.tccMode ? "TCC" : "WDDM");  message += buff;
-	sprintf_s(buff, "\tClock Rate                     : %dMhz\n", params.clockRate/1000);   message += buff;
-	sprintf_s(buff, "\tTotal global memory            : %.1f GB\n", totalMemory);    message += buff;
-	sprintf_s(buff, "\tShared memory                  : %.1f KB\n", sharedMemory);   message += buff;
-	sprintf_s(buff, "\tCompute Capability             : %d.%d\n", params.major, params.minor);     message += buff;
-	sprintf_s(buff, "\tWarp size                      : %d\n", params.warpSize);            message += buff;
-	sprintf_s(buff, "\tMax threads per block          : %d\n", params.maxThreadsPerBlock);  message += buff;
-	sprintf_s(buff, "\tMax threads per multiprocessor : %d\n", params.maxThreadsPerMP);     message += buff;
-	sprintf_s(buff, "\tNumber of multiprocessors      : %d\n", params.multiProcessorCount); message += buff;
+	const int buffSize = 1024;
+	char buff[buffSize];
+	snprintf(buff, buffSize, "Device[%d] is : %s\n\n", params.devId, params.name.c_str()); message += buff;
+	snprintf(buff, buffSize, "\tDriver mode                    : %s\n", params.tccMode ? "TCC" : "WDDM");  message += buff;
+	snprintf(buff, buffSize, "\tClock Rate                     : %dMhz\n", params.clockRate/1000);   message += buff;
+	snprintf(buff, buffSize, "\tTotal global memory            : %.1f GB\n", totalMemory);    message += buff;
+	snprintf(buff, buffSize, "\tShared memory                  : %.1f KB\n", sharedMemory);   message += buff;
+	snprintf(buff, buffSize, "\tCompute Capability             : %d.%d\n", params.ccmajor, params.ccminor);     message += buff;
+	snprintf(buff, buffSize, "\tWarp size                      : %d\n", params.warpSize);            message += buff;
+	snprintf(buff, buffSize, "\tMax threads per block          : %d\n", params.maxThreadsPerBlock);  message += buff;
+	snprintf(buff, buffSize, "\tMax threads per multiprocessor : %d\n", params.maxThreadsPerMP);     message += buff;
+	snprintf(buff, buffSize, "\tNumber of multiprocessors      : %d\n", params.multiProcessorCount); message += buff;
 
 	message += "\n";
 	return message;
@@ -310,7 +311,7 @@ GPUResult Device::setSource(const std::string& ptxSource) {
 	char logBuffer[bufferSize];
 	char errorBuffer[bufferSize];
 
-	int optimizationLevel = 4;
+	const int optimizationLevel = 4;
 
 	int numOptions = 0;
 	CUjit_option options[20];
@@ -408,8 +409,7 @@ void Kernel::addParamInt(int i) {
 
 std::string a7az0th::getFileContents(const std::string& file) {
 	std::string res = "";
-	FILE* fp = nullptr;
-	fopen_s(&fp, file.c_str(), "rb");
+	FILE* fp = fopen(file.c_str(), "rb");
 	if (!fp) {
 		return res;
 	}
@@ -419,7 +419,7 @@ std::string a7az0th::getFileContents(const std::string& file) {
 	fseek(fp, 0, SEEK_SET);
 
 	char* buffer = new char[len+1];
-	fread_s(buffer, len, sizeof(char), len-1, fp);
+	fread(buffer, sizeof(char), len-1, fp);
 	buffer[len] = '\0';
 	fclose(fp);
 
