@@ -2,7 +2,7 @@
 
 #include "cuew.h"
 
-//#include <string>
+#include <string>
 #include <string.h> //GCC looks for memcpy here
 #include <vector>
 #include <map>
