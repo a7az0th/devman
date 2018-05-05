@@ -1,7 +1,8 @@
 #pragma once
 
-#include <cuda.h>
-#include <cstring>
+#include "cuew.h"
+
+#include <string>
 #include <vector>
 #include <map>
 
@@ -62,7 +63,7 @@ struct Device {
 		if (context) { res = cuCtxDestroy(context); }
 	}
 
-	std::string getInfo() const; //< Produces a string out of the contained device info and returns it
+	std::string getInfo() const; ///< Produces a string out of the contained device info and returns it
 
 	CUresult setSource(const std::string& ptxSource);
 	CUresult launch(const Kernel& kernel, CUstream stream = nullptr);

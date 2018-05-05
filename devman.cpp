@@ -65,18 +65,30 @@ int DeviceManager::init(int emulation) {
 	//Nothing to do if already initialized.
 	if (initialized) return err;
 
-	err = cuInit(0);
-	checkError(err);
+	if (cuewInit(CUEW_INIT_CUDA) != CUEW_SUCCESS) {
+		printf("CUDA could not be initialized! Setting up the CPU as a CUDA emulation device!\n");
+		numDevices = 1;
+		devices.resize(numDevices);
+		const int devIdx = 0;
+		Device& devInfo = devices[devIdx];
+		devInfo.setEmulation(1);
+		devInfo.params.devId = devIdx;
+		devInfo.params.name = std::string("Emulator");
+	} else {
 
-	err = cuDeviceGetCount(&numDevices);
-	checkError(err);
-
-	devices.resize(numDevices);
-	for (int i = 0; i < numDevices; i++) {
-		Device& devInfo = devices[i];
-		devInfo.setEmulation(emulation);
-		int err = getDeviceInfo(i, devInfo);
+		err = cuInit(0);
 		checkError(err);
+
+		err = cuDeviceGetCount(&numDevices);
+		checkError(err);
+
+		devices.resize(numDevices);
+		for (int i = 0; i < numDevices; i++) {
+			Device& devInfo = devices[i];
+			devInfo.setEmulation(emulation);
+			int err = getDeviceInfo(i, devInfo);
+			checkError(err);
+		}
 	}
 
 	initialized = 1;
@@ -287,10 +299,18 @@ std::string Device::getInfo() const {
 	const float totalMemory = float(params.memory) / float(1024 * 1024 * 1024);
 	const float sharedMemory = float(params.sharedMemPerBlock) / float(1024);
 
+	std::string driverMode = "";
+	switch(params.tccMode) {
+		case 0: driverMode = "WDDM"; break;
+		case 1: driverMode = "TCC"; break;
+		default:
+			driverMode = "Unknown"; break;
+	}
+
 	const int buffSize = 1024;
 	char buff[buffSize];
 	snprintf(buff, buffSize, "Device[%d] is : %s\n\n", params.devId, params.name.c_str()); message += buff;
-	snprintf(buff, buffSize, "\tDriver mode                    : %s\n", params.tccMode ? "TCC" : "WDDM");  message += buff;
+	snprintf(buff, buffSize, "\tDriver mode                    : %s\n", driverMode.c_str());  message += buff;
 	snprintf(buff, buffSize, "\tClock Rate                     : %dMhz\n", params.clockRate/1000);   message += buff;
 	snprintf(buff, buffSize, "\tTotal global memory            : %.1f GB\n", totalMemory);    message += buff;
 	snprintf(buff, buffSize, "\tShared memory                  : %.1f KB\n", sharedMemory);   message += buff;
