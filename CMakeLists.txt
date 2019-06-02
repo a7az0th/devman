@@ -29,3 +29,5 @@ add_executable(${PROJECT_NAME} ${HEADERS} ${SOURCES})
 
 target_link_libraries(${PROJECT_NAME} ${CMAKE_DL_LIBS})
 target_link_libraries(${PROJECT_NAME} utils)
+
+#install(TARGETS myapp DESTINATION bin)

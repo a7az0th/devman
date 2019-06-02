@@ -8,6 +8,10 @@ using namespace a7az0th;
 typedef CUresult GPUResult;
 #define GPU_SUCCESS (CUDA_SUCCESS);
 
+// Read the contents of the file given and return them as string.
+// @return Empty string on failure and the file contents on success
+std::string getFileContents(const std::string& file);
+
 // Method is called when a cuda error is encountered to print information
 // error code, in what file, what line and which funtion was executed at the time of the error
 void printMessage(int error, const char* file, int line, const char* func) {
@@ -56,6 +60,8 @@ public:
 private:
 	int needPop;
 };
+
+/////////////////////////////////////////////////////////////////////////////////
 
 DeviceManager::DeviceManager() : initialized(0), numDevices(0) {}
 DeviceManager::~DeviceManager() { deinit(); }
@@ -183,50 +189,8 @@ int DeviceManager::getDeviceInfo(int deviceIndex, Device &devInfo) {
 	return err != GPU_SUCCESS;
 }
 
-DeviceError DeviceManager::initDevices(std::string& sourceFile) {
-	assert(numDevices > 0);
-	if (numDevices <= 0) {
-		return DeviceError::NoDevicesFound;
-	}
-	
-	std::string ptx = getFileContents(sourceFile);
-	if (ptx[0] == '\0') {
-		return DeviceError::PtxSourceNotFound;
-	}
-	for (int i = 0; i < numDevices; i++) {
-		Device& device = getDevice(i);
-		std::string stats = device.getInfo();
-		printf("%s\n", stats.c_str());
+/////////////////////////////////////////////////////////////////////////////////
 
-		CUresult err = device.setSource(ptx);
-		if (err != CUDA_SUCCESS) {
-			return DeviceError::InvalidPtx;
-		}
-	}
-	return DeviceError::Success;
-}
-
-std::vector<ThreadData> DeviceManager::initThreadData(int numThreads) {
-	std::vector<ThreadData> res(numThreads);
-	std::vector<int> threadMap(numThreads);
-	for (int i=0; i < numThreads; i++) {
-		CUresult err = CUDA_SUCCESS;
-		ThreadData& td = res[i];
-	
-		td.device = &getDevice(i % numDevices);
-		err = cuCtxSetCurrent(td.device->getContext());
-		if (err != CUDA_SUCCESS) { 
-			return std::vector<ThreadData>();
-		}
-
-		err = cuStreamCreate(&td.stream, 0);//CU_STREAM_NON_BLOCKING
-		if (err != CUDA_SUCCESS) { 
-			return std::vector<ThreadData>();
-		}
-	}
-
-	return res;
-}
 
 int DeviceBuffer::free() {
 	GPUResult err = GPU_SUCCESS;	
@@ -259,7 +223,7 @@ int DeviceBuffer::alloc(size_t size) {
 	return err != GPU_SUCCESS;
 }
 
-int DeviceBuffer::upload(void* host, size_t size, CUstream stream) {
+int DeviceBuffer::uploadAsync(void* host, size_t size, CUstream stream) {
 	if (!buffer) return CUDA_ERROR_NOT_INITIALIZED;
 	if (size > this->size) return CUDA_ERROR_OUT_OF_MEMORY;
 
@@ -275,7 +239,7 @@ int DeviceBuffer::upload(void* host, size_t size, CUstream stream) {
 	return err != GPU_SUCCESS;
 }
 
-int DeviceBuffer::download(void* host, CUstream stream) {
+int DeviceBuffer::downloadAsync(void* host, CUstream stream) {
 	assert(host != nullptr);
 	GPUResult err = GPU_SUCCESS;
 
@@ -287,6 +251,38 @@ int DeviceBuffer::download(void* host, CUstream stream) {
 	}
 	return err != GPU_SUCCESS;
 }
+
+int DeviceBuffer::upload(void* host, size_t size) {
+	if (!buffer) return CUDA_ERROR_NOT_INITIALIZED;
+	if (size > this->size) return CUDA_ERROR_OUT_OF_MEMORY;
+
+	assert(buffer != nullptr);
+	
+	GPUResult err = GPU_SUCCESS;
+
+	if (emulate) {
+		memcpy(buffer, host, size);
+	} else {
+		err = cuMemcpyHtoD((CUdeviceptr)buffer, host, size);
+	}
+	return err != GPU_SUCCESS;
+}
+
+int DeviceBuffer::download(void* host) {
+	assert(host != nullptr);
+	GPUResult err = GPU_SUCCESS;
+
+	if (emulate) {
+		memcpy(host, buffer, size);
+	} else {
+		err = cuMemcpyDtoH(host, (CUdeviceptr)buffer, size);
+		checkError(err);
+	}
+	return err != GPU_SUCCESS;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////////
 
 std::string Device::getInfo() const {
 	std::string message = "";
@@ -319,10 +315,12 @@ std::string Device::getInfo() const {
 	return message;
 }
 
-GPUResult Device::setSource(const std::string& ptxSource) {
+GPUResult Device::setSource(const std::string& ptxFile) {
 	assert(context != nullptr);
 
-	const int bufferSize = (1024 * 50);
+	std::string ptxSource = getFileContents(ptxFile);
+
+	const int bufferSize = (2048);
 	char logBuffer[bufferSize];
 	char errorBuffer[bufferSize];
 
@@ -363,27 +361,14 @@ GPUResult Device::setSource(const std::string& ptxSource) {
 	return GPU_SUCCESS;
 }
 
-CUresult Device::launch(const Kernel& ker, CUstream stream) {
-	CUresult err = CUDA_SUCCESS;
+//////////////////////////////////////////////////////////////////////////////
 
-	if (emulate) {
-		//
-	} else {
-		err = cuLaunchKernel(ker.function,
-			ker.numBlocks, 1, 1,
-			ker.threadsPerBlock, 1, 1,
-			ker.sharedMem,
-			stream,
-			(void**)ker.params,
-			nullptr); //extra
-		checkError(err);
-	}
-	return err;
-}
-
-Kernel::Kernel(std::string& name, CUmodule program, int numBlocks, int threadsPerBlock, int sharedMem) : 
-	name(name), function(nullptr), offset(0), numParams(0), threadsPerBlock(threadsPerBlock), numBlocks(numBlocks), sharedMem(sharedMem) {
-
+Kernel::Kernel(std::string name, CUmodule program): 
+	name(name), 
+	function(nullptr), 
+	offset(0), 
+	numParams(0)
+{
 	CUresult err = CUDA_SUCCESS;
 	err = cuModuleGetFunction(&function, program, name.c_str());
 	assert(err == CUDA_SUCCESS);
@@ -415,9 +400,62 @@ void Kernel::addParamInt(int i) {
 	offset += size;
 }
 
-std::string a7az0th::getFileContents(const std::string& file) {
+//////////////////////////////////////////////////////////////////////////////
 
-	std::ifstream ifs("myfile.txt");
+ThreadData::ThreadData(Device& device): 
+	device(device), 
+	stream(nullptr) 
+{
+	CUresult err = cuStreamCreate(&stream, CU_STREAM_NON_BLOCKING);
+	assert(err == CUDA_SUCCESS);
+}
+
+ThreadData::~ThreadData() {
+	freeMem();
+}
+
+void ThreadData::freeMem() {
+	if (stream) {
+		CUresult err = cuStreamDestroy(stream);
+		assert(err == CUDA_SUCCESS);
+	}
+	stream = 0;
+}
+
+CUresult ThreadData::launch(const Kernel& ker, const int workSize) {
+	if (workSize <= 0) {
+		return CUDA_SUCCESS;
+	}
+
+	CUresult err = CUDA_SUCCESS;
+	const int sharedMem = 0;
+
+	int threadsPerBlock = 1024;
+	const int numBlocks = (workSize + (threadsPerBlock-1)) / threadsPerBlock;
+	threadsPerBlock = workSize / numBlocks;
+
+	err = cuLaunchKernel(ker.function,
+		numBlocks, 1, 1,
+		threadsPerBlock, 1, 1,
+		sharedMem,
+		stream,
+		(void**)ker.params,
+		nullptr); //extra
+	checkError(err);
+
+	return err;
+}
+
+void ThreadData::wait() const {
+	CUresult err = CUDA_SUCCESS;
+	err = cuStreamSynchronize(stream);
+	assert(err == CUDA_SUCCESS);
+	return;
+}
+//////////////////////////////////////////////////////////////////////////////
+std::string getFileContents(const std::string& file) {
+
+	std::ifstream ifs(file);
 	const std::string res = std::string((std::istreambuf_iterator<char>(ifs)), (std::istreambuf_iterator<char>()));
 	return res;
 }

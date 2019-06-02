@@ -14,7 +14,7 @@ setlocal
 
 @set HOST_COMPILER="C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\bin\cl.exe"
  rem 
-@set  COMPILER_OPTIONS= --default-stream per-thread -ccbin %HOST_COMPILER% -gencode arch=compute_%CC%,code=sm_%CC% -use_fast_math -O5 -lineinfo --maxrregcount 64 --machine 64 -v
+@set  COMPILER_OPTIONS= --default-stream per-thread -ccbin %HOST_COMPILER% -gencode arch=compute_%CC%,code=sm_%CC% -use_fast_math -O0 -lineinfo --maxrregcount 64 --machine 64 -v
 @echo COMPILER OPTIONS:
 @echo %COMPILER_OPTIONS%
 @echo ----------------------------------------------------
@@ -22,9 +22,11 @@ setlocal
 @echo LINKER_OPTIONS:
 @echo %LINKER_OPTIONS%
 @echo ----------------------------------------------------
+@set  INCLUDES=-I"../include"
+@echo ----------------------------------------------------
 
 @echo NVCC Compiling kernel.cu for Compute Capability %CC% x64
-@"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v9.0\bin\nvcc.exe" %COMPILER_OPTIONS% %LINKER_OPTIONS% kernel.cu -o kernel.%SUFFIX% > cudaoutput.txt 2>&1
+@"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v9.0\bin\nvcc.exe" %COMPILER_OPTIONS% %LINKER_OPTIONS% %INCLUDES% kernel.cu -o kernel.%SUFFIX% > cudaoutput.txt 2>&1
 
 @REM Sort out warnings and errors in separate files
 @findstr /C:"warning:" cudaoutput.txt > CUDAwarnings.txt

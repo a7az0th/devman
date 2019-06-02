@@ -37,17 +37,25 @@ public:
 	int alloc(size_t size);
 	// Free any resources owned
 	int free();
-	// Upload a given host buffer to the device
-	int upload(void* host, size_t size, CUstream stream = nullptr);
+	// Synchronously upload a given host buffer to the device
+	int upload(void* host, size_t size);
+
+	// Upload a given host buffer to the device ASYNCHRONOUSLY
+	int uploadAsync(void* host, size_t size, CUstream stream);
+
 	//Download a device buffer into the given host pointer. Pointer MUST point to a large enough buffer!
-	int download(void* host, CUstream stream = nullptr);
+	int download(void* host);
+
+	// Download buffer from the device ASYNCHRONOUSLY
+	int downloadAsync(void* host, CUstream stream);
+	
 	// Returns the device pointer associated with this DeviceBuffer
 	const void* get() const { return buffer; }
+	
 	// Returns the size of the buffer allocated on the device
 	size_t getSize() const { return size; }
 private:
-
-	std::string name; // Name of this buffer. Used to query the buffer from the device
+	std::string name; // Name of this buffer.
 	void* buffer; // Pointer to the buffer on the device
 	size_t size; // Size of the buffer in bytes
 	const int emulate; // True if the buffer is in emulation mode. aka it is allocated on the CPU
@@ -89,13 +97,10 @@ struct Device {
 
 	std::string getInfo() const; // Produce a string out of the contained device info and return it
 
-	CUresult setSource(const std::string& ptxSource);
-	CUresult launch(const Kernel& kernel, CUstream stream = nullptr);
+	CUresult setSource(const std::string& ptxFile);
 
 	//Return true if the device is emulating a CUDA device
-	int isEmulator() { return emulate; }
-	//Set emulation mode for this device. Valid to be called only during initialization
-	void setEmulation(int val) { emulate = val; }
+	int isEmulator() const { return emulate; }
 
 	//Parameters
 	struct Params {
@@ -130,11 +135,34 @@ struct Device {
 		{}
 	} params;
 
-	CUcontext getContext() {
+	// Get the device context
+	CUcontext getContext() const {
 		return context;
 	}
 
+	CUmodule getProgram() const {
+		return program;
+	}
+
+	void makeCurrent() const {
+		CUresult err = CUDA_SUCCESS;
+		CUcontext currentCtx = nullptr;
+		err = cuCtxGetCurrent(&currentCtx);
+		assert(err == CUDA_SUCCESS);
+
+		if (currentCtx == context) {
+			//The context is already current. Nothing to do
+			return;
+		}
+
+		err = cuCtxSetCurrent(context);
+		assert(err == CUDA_SUCCESS);
+	}
+
 private:
+	//Set emulation mode for this device. Valid to be called only during initialization
+	void setEmulation(int val) { emulate = val; }
+
 	CUdevice handle;   //< Handle to the CUDA device
 	CUcontext context; //< Handle to the CUDA context associated with this device
 	CUmodule program;  //< Handle to the compiled program
@@ -169,9 +197,6 @@ struct DeviceManager {
 	Device& getDevice(int index);
 	int getDeviceCount() const { return numDevices; }
 
-	DeviceError initDevices(std::string& ptx);
-
-	std::vector<ThreadData> initThreadData(int numThreads);
 private:
 	// Ask for information about a particular device
 	// @param deviceIndex The index of the device that we are querying
@@ -199,23 +224,20 @@ private:
 };
 
 struct Kernel {
-	Kernel(std::string& name, CUmodule program, int numBlocks, int threadsPerBlock, int sharedMem);
+	friend struct ThreadData;
+	Kernel(std::string name, CUmodule program);
 	~Kernel();
 
 	void addParamPtr(const void* ptr);
 	void addParamInt(int i);
 
-	const std::string name;
-
 	CUfunction handle() { return function; }
-	friend struct Device;
 private:
-	int numBlocks;
-	int threadsPerBlock;
-	int sharedMem;
+	const std::string name;
+	CUfunction function;
+
 	int offset;
 	char pool[4096];
-	CUfunction function;
 
 	int numParams;
 	void* params[1024];
@@ -223,22 +245,17 @@ private:
 
 struct ThreadData {
 
-	Device* device;
-	CUstream stream;
+	ThreadData(Device& device);
+	~ThreadData();
 
-	ThreadData(): device(nullptr), stream(nullptr)
-	{}
-	~ThreadData() {
-		freeMem();
-		device = nullptr;
-	}
-	void freeMem() {
-		//blank
-	}
+	CUresult launch(const Kernel& kernel, const int workSize);
+	void wait() const;
+
+	void freeMem();
+private:
+	Device &device;
+	CUstream stream;
 };
 
-// Read the contents of the file given and return them as string.
-// @return Empty string on failure and the file contents on success
-std::string getFileContents(const std::string& file);
 
 } //namespace a7az0th

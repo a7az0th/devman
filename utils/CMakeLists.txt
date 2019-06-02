@@ -14,6 +14,8 @@ set(HEADERS
 	include/error_code.h
 	include/progress.h
 	include/table.h
+	include/timer.h
+	include/threadman.h
 )
 
 set(SOURCES
