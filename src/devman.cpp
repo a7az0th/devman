@@ -1,6 +1,7 @@
 #include "devman.h"
 
 #include <assert.h>
+#include <fstream>
 
 using namespace a7az0th;
 
@@ -63,7 +64,9 @@ int DeviceManager::init(int emulation) {
 
 	GPUResult err = GPU_SUCCESS;
 	//Nothing to do if already initialized.
-	if (initialized) return err;
+	if (initialized) {
+		return err;
+	}
 
 	if (cuewInit(CUEW_INIT_CUDA) != CUEW_SUCCESS) {
 		printf("CUDA could not be initialized! Setting up the CPU as a CUDA emulation device!\n");
@@ -180,15 +183,15 @@ int DeviceManager::getDeviceInfo(int deviceIndex, Device &devInfo) {
 	return err != GPU_SUCCESS;
 }
 
-int DeviceManager::initDevices(std::string& sourceFile) {
+DeviceError DeviceManager::initDevices(std::string& sourceFile) {
 	assert(numDevices > 0);
 	if (numDevices <= 0) {
-		return 1; //NoDevicesFound;
+		return DeviceError::NoDevicesFound;
 	}
 	
 	std::string ptx = getFileContents(sourceFile);
 	if (ptx[0] == '\0') {
-		return 2;//PtxSourceNotFound;
+		return DeviceError::PtxSourceNotFound;
 	}
 	for (int i = 0; i < numDevices; i++) {
 		Device& device = getDevice(i);
@@ -197,10 +200,10 @@ int DeviceManager::initDevices(std::string& sourceFile) {
 
 		CUresult err = device.setSource(ptx);
 		if (err != CUDA_SUCCESS) {
-			return 3;//InvalidPtx;
+			return DeviceError::InvalidPtx;
 		}
 	}
-	return 0;//Success;
+	return DeviceError::Success;
 }
 
 std::vector<ThreadData> DeviceManager::initThreadData(int numThreads) {
@@ -211,28 +214,28 @@ std::vector<ThreadData> DeviceManager::initThreadData(int numThreads) {
 		ThreadData& td = res[i];
 	
 		td.device = &getDevice(i % numDevices);
-		err = cuCtxPushCurrent(td.device->context);
-		if (err != CUDA_SUCCESS) { return std::vector<ThreadData>(); }//Failure; }
+		err = cuCtxSetCurrent(td.device->getContext());
+		if (err != CUDA_SUCCESS) { 
+			return std::vector<ThreadData>();
+		}
+
 		err = cuStreamCreate(&td.stream, 0);//CU_STREAM_NON_BLOCKING
-		if (err != CUDA_SUCCESS) { return std::vector<ThreadData>(); }//Failure; }
-		err = cuCtxPopCurrent(NULL);
-		if (err != CUDA_SUCCESS) { return std::vector<ThreadData>(); }//Failure; }
+		if (err != CUDA_SUCCESS) { 
+			return std::vector<ThreadData>();
+		}
 	}
 
 	return res;
 }
 
 int DeviceBuffer::free() {
-	GPUResult err = GPU_SUCCESS;
-
-	PushContextRAII push(emulate, context, err);
-	checkError(err);
-	
+	GPUResult err = GPU_SUCCESS;	
 	if (buffer) {
 		if (emulate) {
 			delete [] static_cast<char*>(buffer);
 		} else {
 			err = cuMemFree((CUdeviceptr)buffer);
+			assert(err == CUDA_SUCCESS);
 		}
 		buffer = NULL;
 		size = 0;
@@ -242,10 +245,6 @@ int DeviceBuffer::free() {
 
 int DeviceBuffer::alloc(size_t size) {
 	GPUResult err = GPU_SUCCESS;
-
-	PushContextRAII push(emulate, context, err);
-	checkError(err);
-
 	if (buffer) {
 		free();
 	}
@@ -254,6 +253,7 @@ int DeviceBuffer::alloc(size_t size) {
 		buffer = new char[size];
 	} else {
 		err = cuMemAlloc((CUdeviceptr*)&buffer, size);
+		assert(err == CUDA_SUCCESS);
 	}
 	this->size = size;
 	return err != GPU_SUCCESS;
@@ -266,8 +266,6 @@ int DeviceBuffer::upload(void* host, size_t size, CUstream stream) {
 	assert(buffer != nullptr);
 	
 	GPUResult err = GPU_SUCCESS;
-	PushContextRAII push(emulate, context, err);
-	checkError(err);
 
 	if (emulate) {
 		memcpy(buffer, host, size);
@@ -280,9 +278,6 @@ int DeviceBuffer::upload(void* host, size_t size, CUstream stream) {
 int DeviceBuffer::download(void* host, CUstream stream) {
 	assert(host != nullptr);
 	GPUResult err = GPU_SUCCESS;
-
-	PushContextRAII push(emulate, context, err);
-	checkError(err);
 
 	if (emulate) {
 		memcpy(host, buffer, size);
@@ -362,9 +357,6 @@ GPUResult Device::setSource(const std::string& ptxSource) {
 	numOptions++;
 
 	CUresult err = CUDA_SUCCESS;
-	PushContextRAII push(emulate, context, err);
-	checkError(err);
-
 	err = cuModuleLoadDataEx(&program, ptxSource.c_str(), numOptions, options, optionValues);
 	checkError(err);
 
@@ -373,9 +365,6 @@ GPUResult Device::setSource(const std::string& ptxSource) {
 
 CUresult Device::launch(const Kernel& ker, CUstream stream) {
 	CUresult err = CUDA_SUCCESS;
-
-	PushContextRAII push(emulate, context, err);
-	checkError(err);
 
 	if (emulate) {
 		//
@@ -426,25 +415,9 @@ void Kernel::addParamInt(int i) {
 	offset += size;
 }
 
-
 std::string a7az0th::getFileContents(const std::string& file) {
-	std::string res = "";
-	FILE* fp = fopen(file.c_str(), "rb");
-	if (!fp) {
-		return res;
-	}
 
-	fseek(fp, 0, SEEK_END);
-	unsigned long len = (unsigned long)ftell(fp);
-	fseek(fp, 0, SEEK_SET);
-
-	char* buffer = new char[len+1];
-	fread(buffer, sizeof(char), len-1, fp);
-	buffer[len] = '\0';
-	fclose(fp);
-
-	res = buffer;
-	delete[] buffer;
-
+	std::ifstream ifs("myfile.txt");
+	const std::string res = std::string((std::istreambuf_iterator<char>(ifs)), (std::istreambuf_iterator<char>()));
 	return res;
 }

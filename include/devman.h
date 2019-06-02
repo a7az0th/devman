@@ -2,6 +2,7 @@
 
 #include "cuew.h"
 
+#include <assert.h>
 #include <string>
 #include <string.h> //GCC looks for memcpy here
 #include <vector>
@@ -12,12 +13,24 @@ namespace a7az0th {
 struct Device;
 struct ThreadData;
 // A structure managing host-to-device buffer transfers
+// Buffers are just a means to transfer data back and forth device and host
+// The buffer is in no way responsible for managing what goes where.
+// The programmer is responsible for managing device contexts and setting the right
+// context on the CUDA stack prior to every buffer invocation
 struct DeviceBuffer {
 
 public:
 	friend struct Device;
 	friend struct ThreadData;
 
+	DeviceBuffer(std::string& name=std::string("unnamed"), int emulate=0): 
+		name(name), 
+		emulate(emulate), 
+		buffer(NULL), 
+		size(0) 
+	{
+		//blank
+	}
 	~DeviceBuffer() { free(); }
 
 	// Allocate a device buffer of given size
@@ -33,13 +46,11 @@ public:
 	// Returns the size of the buffer allocated on the device
 	size_t getSize() const { return size; }
 private:
-	DeviceBuffer(std::string& name, CUcontext context, int emulate=0) : name(name), context(context), emulate(emulate), buffer(NULL), size(0) {}
-	
-	std::string name;
-	void* buffer;
-	size_t size;
-	const int emulate;
-	CUcontext context;
+
+	std::string name; // Name of this buffer. Used to query the buffer from the device
+	void* buffer; // Pointer to the buffer on the device
+	size_t size; // Size of the buffer in bytes
+	const int emulate; // True if the buffer is in emulation mode. aka it is allocated on the CPU
 };
 
 
@@ -48,6 +59,7 @@ private:
 struct Kernel;
 // A containter for CUDA device information
 struct Device {
+	friend struct DeviceManager;
 	//Methods
 
 	Device(int emulate = 0): 
@@ -58,33 +70,32 @@ struct Device {
 	{
 	}
 
-	~Device() {
+	void freeMem() {
 		CUresult res = CUDA_SUCCESS;
-		if (program) { res = cuModuleUnload(program); }
-		if (context) { res = cuCtxDestroy(context); }
+		if (program) {
+			res = cuModuleUnload(program);
+			assert(res == CUDA_SUCCESS);
+			program = nullptr;
+		}
+		if (context) {
+			res = cuCtxDestroy(context);
+			context = nullptr;
+		}
 	}
 
-	std::string getInfo() const; ///< Produces a string out of the contained device info and returns it
+	~Device() {
+		freeMem();
+	}
+
+	std::string getInfo() const; // Produce a string out of the contained device info and return it
 
 	CUresult setSource(const std::string& ptxSource);
 	CUresult launch(const Kernel& kernel, CUstream stream = nullptr);
 
-	//Returns true if the device is emulating a CUDA device
+	//Return true if the device is emulating a CUDA device
 	int isEmulator() { return emulate; }
+	//Set emulation mode for this device. Valid to be called only during initialization
 	void setEmulation(int val) { emulate = val; }
-
-	DeviceBuffer* getBuffer(std::string name) {
-		DeviceBuffer* res = nullptr;
-
-		const auto& it = buffers.find(name);
-		if (it == buffers.end()) {
-			res = new DeviceBuffer(name, context, emulate);
-			buffers[name] = res;
-		} else {
-			res = it->second;
-		}
-		return res;
-	}
 
 	//Parameters
 	struct Params {
@@ -119,13 +130,22 @@ struct Device {
 		{}
 	} params;
 
-	CUdevice handle;                   //< Handle to the CUDA device
-	CUcontext context;                 //< Handle to the CUDA context associated with this device
-	CUmodule program;                  //< Handle to the compiled program
+	CUcontext getContext() {
+		return context;
+	}
 
 private:
-	std::map<std::string, DeviceBuffer*> buffers;
+	CUdevice handle;   //< Handle to the CUDA device
+	CUcontext context; //< Handle to the CUDA context associated with this device
+	CUmodule program;  //< Handle to the compiled program
 	int emulate;
+};
+
+enum class DeviceError {
+	Success,
+	NoDevicesFound,
+	PtxSourceNotFound,
+	InvalidPtx,
 };
 
 // Main GPU management class. A singleton class. You cannot create it explicitly
@@ -134,13 +154,14 @@ private:
 // Can be asked to provide information for a particular device
 // The process method would start the processing on the GPU
 struct DeviceManager {
-
+	
 	// The only way to obtain an instance of an object is through this method
 	static DeviceManager& getInstance(int emulation=0) {
 		static DeviceManager instance;
 		instance.init(emulation);
 		return instance;
 	}
+
 	// Destructor. Should call deinit();
 	~DeviceManager();
 
@@ -148,7 +169,7 @@ struct DeviceManager {
 	Device& getDevice(int index);
 	int getDeviceCount() const { return numDevices; }
 
-	int initDevices(std::string& ptx);
+	DeviceError initDevices(std::string& ptx);
 
 	std::vector<ThreadData> initThreadData(int numThreads);
 private:
@@ -214,21 +235,6 @@ struct ThreadData {
 	void freeMem() {
 		//blank
 	}
-
-	DeviceBuffer* getBuffer(std::string name) {
-		DeviceBuffer* res = nullptr;
-
-		const auto& it = buffers.find(name);
-		if (it == buffers.end()) {
-			res = new DeviceBuffer(name, device->context, device->isEmulator());
-			buffers[name] = res;
-		} else {
-			res = it->second;
-		}
-		return res;
-	}
-private:
-	std::map<std::string, DeviceBuffer*> buffers;
 };
 
 // Read the contents of the file given and return them as string.

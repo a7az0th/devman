@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include "devman.h"
-
+#include "table.h"
 
 using namespace a7az0th;
 
@@ -13,6 +13,10 @@ int main() {
 	for (int i = 0; i < numDevices; i++) {
 		Device& d = devman.getDevice(i);
 		std::string info = d.getInfo();
+
+		DeviceBuffer buffer;
+		buffer.alloc(1000000000);//allocate 1 GB
+
 		printf("%s\n", info.c_str());
 	}
 

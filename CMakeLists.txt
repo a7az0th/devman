@@ -1,21 +1,31 @@
 cmake_minimum_required (VERSION 2.6)
 project (devman)
 
-MESSAGE(STATUS "PROJECT_SOURCE_DIR: " ${PROJECT_SOURCE_DIR})
+message(STATUS "PROJECT_SOURCE_DIR: " ${PROJECT_SOURCE_DIR})
 
 include_directories(
-	${PROJECT_SOURCE_DIR}
+	${PROJECT_SOURCE_DIR}/include
 	${PROJECT_SOURCE_DIR}/cuew
 )
 
-SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 
-SET(SOURCES
-	main.cpp
-	devman.cpp
+set(HEADERS
+	include/utils.h
+	include/devman.h
+)
+
+set(SOURCES
+	src/main.cpp
+	src/devman.cpp
 	cuew/cuew.c
 )
 
-add_executable(devman.bin ${SOURCES})
+add_subdirectory(utils)
 
-target_link_libraries(devman.bin ${CMAKE_DL_LIBS})
+include_directories(${utils_SOURCE_DIR}/include)
+
+add_executable(${PROJECT_NAME} ${HEADERS} ${SOURCES})
+
+target_link_libraries(${PROJECT_NAME} ${CMAKE_DL_LIBS})
+target_link_libraries(${PROJECT_NAME} utils)
