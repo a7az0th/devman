@@ -62,9 +62,6 @@ private:
 };
 
 
-
-
-struct Kernel;
 // A containter for CUDA device information
 struct Device {
 	friend struct DeviceManager;
@@ -104,19 +101,19 @@ struct Device {
 
 	//Parameters
 	struct Params {
-		std::string name;                  //< Name of the device as returned by the CUDA API
-		size_t memory;                     //< Total memory in bytes
-		size_t sharedMemPerBlock;          //< Total shared memory per block in bytes
-		int ccmajor;                       //< CUDA Compute Capability major version number
-		int ccminor;                       //< CUDA Compute Capability minor version number
-		int warpSize;                      //< Number of threads in a warp. Most probably 32
-		int multiProcessorCount;           //< Number of SMs in the GPU
-		int maxThreadsPerBlock;            //< Maximum number of threads that can work concurrently in a block
-		int maxThreadsPerMP;               //< Maximum number of threads that can work concurrently in a SM
-		int devId;                         //< The index of this device
-		int busId;                         //< Index of the PCI bus on which the device is mounted
-		int tccMode;                       //< True if device is running in Tesla Compute Cluster mode
-		int clockRate;                     //< Device clock rate in MHz
+		std::string name;         //< Name of the device as returned by the CUDA API
+		size_t memory;            //< Total memory in bytes
+		size_t sharedMemPerBlock; //< Total shared memory per block in bytes
+		int ccmajor;              //< CUDA Compute Capability major version number
+		int ccminor;              //< CUDA Compute Capability minor version number
+		int warpSize;             //< Number of threads in a warp. Most probably 32
+		int multiProcessorCount;  //< Number of SMs in the GPU
+		int maxThreadsPerBlock;   //< Maximum number of threads that can work concurrently in a block
+		int maxThreadsPerMP;      //< Maximum number of threads that can work concurrently in a SM
+		int devId;                //< The index of this device
+		int busId;                //< Index of the PCI bus on which the device is mounted
+		int tccMode;              //< True if device is running in Tesla Compute Cluster mode
+		int clockRate;            //< Device clock rate in MHz
 
 		Params() :
 			name("Unknown"),
@@ -223,38 +220,50 @@ private:
 	void operator=(DeviceManager const&) = delete; //< Remove operator=. We don't want anyone to copy objects of this type.
 };
 
+// Wrapper for a device program
 struct Kernel {
 	friend struct ThreadData;
+	// @param name The name of the program entry point
+	// @param program The device module handle that was obtained from compiling the GPU code
 	Kernel(std::string name, CUmodule program);
 	~Kernel();
 
+	// Add a pointer parameter to the kernel execution
 	void addParamPtr(const void* ptr);
+	// Add an integer parameter to the kernel execution
 	void addParamInt(int i);
 
+	// Get a handle to the kernel function. Passed to cuLaunchKernel
 	CUfunction handle() { return function; }
 private:
-	const std::string name;
-	CUfunction function;
+	CUfunction function;  // Handle to the kernel function.
 
-	int offset;
-	char pool[4096];
+	int offset; // Current location in the pool array
+	char pool[4096]; // Memory pool for storing the kernel arguments
 
-	int numParams;
-	void* params[1024];
+	int numParams; // Number of kernel params
+	void* params[1024]; //The actual pointer array of arguments passed on to the kernel
 };
 
+// Represents a launch thread
+// used to launch kernels on the device asynchronously
 struct ThreadData {
 
 	ThreadData(Device& device);
 	~ThreadData();
 
+	// Launched a kernel on the device with the given work size
+	// @param kernel The kernel to launch
+	// @param workSize The size of the job (how many threads to launch)
 	CUresult launch(const Kernel& kernel, const int workSize);
+	// Wait for the kernel launch to finish
 	void wait() const;
 
+	// Frees all resources owned. Safe to be called multile times
 	void freeMem();
 private:
-	Device &device;
-	CUstream stream;
+	Device &device;  // Reference to the device on which we launch
+	CUstream stream; // The cuda stream used for async lauches
 };
 
 

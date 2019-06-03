@@ -364,7 +364,6 @@ GPUResult Device::setSource(const std::string& ptxFile) {
 //////////////////////////////////////////////////////////////////////////////
 
 Kernel::Kernel(std::string name, CUmodule program): 
-	name(name), 
 	function(nullptr), 
 	offset(0), 
 	numParams(0)
