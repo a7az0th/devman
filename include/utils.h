@@ -78,3 +78,5 @@ private:
 
 	T *buff;
 };
+
+#define WIDTH 1024

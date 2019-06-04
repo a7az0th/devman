@@ -13,28 +13,75 @@
 	// .globl	dummy
 
 .visible .entry dummy(
-	.param .u64 dummy_param_0
+	.param .u64 dummy_param_0,
+	.param .u64 dummy_param_1,
+	.param .u64 dummy_param_2
 )
 {
 	.reg .pred 	%p<2>;
-	.reg .b32 	%r<7>;
-	.reg .b64 	%rd<3>;
+	.reg .f32 	%f<28>;
+	.reg .b32 	%r<18>;
+	.reg .b64 	%rd<16>;
 
 
-	ld.param.u64 	%rd1, [dummy_param_0];
-	mov.u32 	%r1, %ctaid.x;
-	mov.u32 	%r2, %ntid.x;
-	mul.lo.s32 	%r3, %r2, %r1;
-	mov.u32 	%r4, %tid.x;
-	neg.s32 	%r5, %r4;
-	setp.ne.s32	%p1, %r3, %r5;
-	@%p1 bra 	BB0_2;
+	ld.param.u64 	%rd5, [dummy_param_0];
+	ld.param.u64 	%rd6, [dummy_param_1];
+	ld.param.u64 	%rd7, [dummy_param_2];
+	cvta.to.global.u64 	%rd1, %rd7;
+	mov.u32 	%r8, %ntid.x;
+	mov.u32 	%r9, %ctaid.x;
+	mov.u32 	%r10, %tid.x;
+	mad.lo.s32 	%r11, %r8, %r9, %r10;
+	shr.s32 	%r12, %r11, 31;
+	shr.u32 	%r13, %r12, 27;
+	add.s32 	%r14, %r11, %r13;
+	and.b32  	%r2, %r14, -32;
+	sub.s32 	%r1, %r11, %r2;
+	cvta.to.global.u64 	%rd8, %rd6;
+	mul.wide.s32 	%rd9, %r2, 4;
+	add.s64 	%rd15, %rd8, %rd9;
+	mov.f32 	%f27, 0f00000000;
+	mov.u32 	%r17, -32;
+	mov.u32 	%r16, %r1;
 
-	cvta.to.global.u64 	%rd2, %rd1;
-	mov.u32 	%r6, 1337;
-	st.global.u32 	[%rd2], %r6;
+BB0_1:
+	mul.wide.s32 	%rd10, %r16, 4;
+	add.s64 	%rd11, %rd1, %rd10;
+	ld.global.f32 	%f4, [%rd11];
+	ld.global.f32 	%f5, [%rd15];
+	fma.rn.ftz.f32 	%f6, %f5, %f4, %f27;
+	ld.global.f32 	%f7, [%rd11+128];
+	ld.global.f32 	%f8, [%rd15+4];
+	fma.rn.ftz.f32 	%f9, %f8, %f7, %f6;
+	ld.global.f32 	%f10, [%rd11+256];
+	ld.global.f32 	%f11, [%rd15+8];
+	fma.rn.ftz.f32 	%f12, %f11, %f10, %f9;
+	ld.global.f32 	%f13, [%rd11+384];
+	ld.global.f32 	%f14, [%rd15+12];
+	fma.rn.ftz.f32 	%f15, %f14, %f13, %f12;
+	ld.global.f32 	%f16, [%rd11+512];
+	ld.global.f32 	%f17, [%rd15+16];
+	fma.rn.ftz.f32 	%f18, %f17, %f16, %f15;
+	ld.global.f32 	%f19, [%rd11+640];
+	ld.global.f32 	%f20, [%rd15+20];
+	fma.rn.ftz.f32 	%f21, %f20, %f19, %f18;
+	ld.global.f32 	%f22, [%rd11+768];
+	ld.global.f32 	%f23, [%rd15+24];
+	fma.rn.ftz.f32 	%f24, %f23, %f22, %f21;
+	ld.global.f32 	%f25, [%rd11+896];
+	ld.global.f32 	%f26, [%rd15+28];
+	fma.rn.ftz.f32 	%f27, %f26, %f25, %f24;
+	add.s32 	%r16, %r16, 256;
+	add.s64 	%rd15, %rd15, 32;
+	add.s32 	%r17, %r17, 8;
+	setp.ne.s32	%p1, %r17, 0;
+	@%p1 bra 	BB0_1;
 
-BB0_2:
+	cvta.to.global.u64 	%rd12, %rd5;
+	add.s32 	%r15, %r2, %r1;
+	mul.wide.s32 	%rd13, %r15, 4;
+	add.s64 	%rd14, %rd12, %rd13;
+	st.global.f32 	[%rd14], %f27;
 	ret;
 }
 
