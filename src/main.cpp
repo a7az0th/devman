@@ -42,20 +42,44 @@ int main() {
 	initBuffer(buffB);
 	initBuffer(buffC);
 
-	Kernel kernel("dummy", d.getProgram());
-	kernel.addParamPtr(buffA.get());
-	kernel.addParamPtr(buffB.get());
-	kernel.addParamPtr(buffC.get());
+	Kernel kernelGlobal("dummyGlobal", d.getProgram());
+	kernelGlobal.addParamPtr(buffA.get());
+	kernelGlobal.addParamPtr(buffB.get());
+	kernelGlobal.addParamPtr(buffC.get());
 
 	ThreadData tData(d);
 	Timer t;
-	t.start();
-	tData.launch(kernel, WIDTH*WIDTH);
+	tData.launch(kernelGlobal, WIDTH*WIDTH);
 	tData.wait();
-	t.stop();
-	const int elapsedNs = t.elapsed(Timer::Precision::Milliseconds);
-	progress.info("Kernel took %d", elapsedNs);
+	const int64 globalTime = t.elapsed(Timer::Precision::Nanoseconds);
+	progress.info("Global Kernel took %lld ns", globalTime);
 
 	buffC.download(arr);
+
+	for (int i = 0; i < 10; i++) {
+		printf("%d ", arr[i]);
+	}
+	printf("\n");
+
+	Kernel kernelShared("dummyShared", d.getProgram());
+	kernelShared.addParamPtr(buffA.get());
+	kernelShared.addParamPtr(buffB.get());
+	kernelShared.addParamPtr(buffC.get());
+
+	t.restart();
+	tData.launch(kernelShared, WIDTH*WIDTH);
+	tData.wait();
+	const int64 sharedTime = t.elapsed(Timer::Precision::Nanoseconds);
+	progress.info("Shared Kernel took %lld ns", sharedTime);
+
+	buffC.download(arr);
+
+	for (int i = 0; i < 10; i++) {
+		printf("%d ", arr[i]);
+	}
+	printf("\n");
+
+	progress.info("Shared kernel is %lf times faster", double(globalTime)/double(sharedTime));
+
 	return 0;
 }

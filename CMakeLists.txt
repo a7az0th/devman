@@ -21,11 +21,16 @@ set(SOURCES
 	cuew/cuew.c
 )
 
+set(GPU_SOURCE
+	gpu_code/kernel.cu
+)
+
 add_subdirectory(utils)
 
 include_directories(${utils_SOURCE_DIR}/include)
 
-add_executable(${PROJECT_NAME} ${HEADERS} ${SOURCES})
+add_executable(${PROJECT_NAME} ${HEADERS} ${SOURCES} ${GPU_SOURCE})
+source_group("GPU Code" FILES ${GPU_SOURCE})
 
 target_link_libraries(${PROJECT_NAME} ${CMAKE_DL_LIBS})
 target_link_libraries(${PROJECT_NAME} utils)
