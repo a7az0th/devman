@@ -196,7 +196,8 @@ int DeviceBuffer::free() {
 	GPUResult err = GPU_SUCCESS;	
 	if (buffer) {
 		if (emulate) {
-			delete [] static_cast<char*>(buffer);
+			const char* handle = static_cast<char*>(buffer);
+			delete [] handle;
 		} else {
 			err = cuMemFree((CUdeviceptr)buffer);
 			assert(err == CUDA_SUCCESS);
@@ -223,34 +224,6 @@ int DeviceBuffer::alloc(size_t size) {
 	return err != GPU_SUCCESS;
 }
 
-int DeviceBuffer::uploadAsync(void* host, size_t size, CUstream stream) {
-	if (!buffer) return CUDA_ERROR_NOT_INITIALIZED;
-	if (size > this->size) return CUDA_ERROR_OUT_OF_MEMORY;
-
-	assert(buffer != nullptr);
-	
-	GPUResult err = GPU_SUCCESS;
-
-	if (emulate) {
-		memcpy(buffer, host, size);
-	} else {
-		err = cuMemcpyHtoDAsync((CUdeviceptr)buffer, host, size, stream);
-	}
-	return err != GPU_SUCCESS;
-}
-
-int DeviceBuffer::downloadAsync(void* host, CUstream stream) {
-	assert(host != nullptr);
-	GPUResult err = GPU_SUCCESS;
-
-	if (emulate) {
-		memcpy(host, buffer, size);
-	} else {
-		err = cuMemcpyDtoHAsync(host, (CUdeviceptr)buffer, size, stream);
-		checkError(err);
-	}
-	return err != GPU_SUCCESS;
-}
 
 int DeviceBuffer::upload(void* host, size_t size) {
 	if (!buffer) return CUDA_ERROR_NOT_INITIALIZED;
@@ -268,6 +241,24 @@ int DeviceBuffer::upload(void* host, size_t size) {
 	return err != GPU_SUCCESS;
 }
 
+int DeviceBuffer::uploadAsync(void* host, size_t size, CUstream stream) {
+	if (!buffer) return CUDA_ERROR_NOT_INITIALIZED;
+	if (size > this->size) return CUDA_ERROR_OUT_OF_MEMORY;
+
+	assert(buffer != nullptr);
+	
+	GPUResult err = GPU_SUCCESS;
+
+	if (emulate) {
+		memcpy(buffer, host, size);
+	} else {
+		err = cuMemcpyHtoDAsync((CUdeviceptr)buffer, host, size, stream);
+	}
+	return err != GPU_SUCCESS;
+}
+
+
+
 int DeviceBuffer::download(void* host) {
 	assert(host != nullptr);
 	GPUResult err = GPU_SUCCESS;
@@ -281,6 +272,18 @@ int DeviceBuffer::download(void* host) {
 	return err != GPU_SUCCESS;
 }
 
+int DeviceBuffer::downloadAsync(void* host, CUstream stream) {
+	assert(host != nullptr);
+	GPUResult err = GPU_SUCCESS;
+
+	if (emulate) {
+		memcpy(host, buffer, size);
+	} else {
+		err = cuMemcpyDtoHAsync(host, (CUdeviceptr)buffer, size, stream);
+		checkError(err);
+	}
+	return err != GPU_SUCCESS;
+}
 
 /////////////////////////////////////////////////////////////////////////////////
 
@@ -419,6 +422,10 @@ void ThreadData::freeMem() {
 		assert(err == CUDA_SUCCESS);
 	}
 	stream = 0;
+}
+
+CUstream ThreadData::getStream() const {
+	return stream;
 }
 
 CUresult ThreadData::launch(const Kernel& ker, const int workSize) {

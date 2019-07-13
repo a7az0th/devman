@@ -4,21 +4,16 @@
 #include "progress.h"
 #include "utils.h"
 
+#include "threadman.h"
+#include "image.h"
+
 using namespace a7az0th;
 
-int arr[WIDTH*WIDTH];
 
-void initBuffer(DeviceBuffer &buff)
-{
-	buff.alloc(sizeof(int)*WIDTH*WIDTH);
-	for (int i = 0; i < WIDTH*WIDTH; i++) {
-		arr[i] = rand();
-	}
-	buff.upload(arr, sizeof(int)*WIDTH*WIDTH);
-}
 
 int main() {
-
+	const int numThreads = getProcessorCount();
+	ThreadManager threadman;
 	ProgressCallback progress;
 
 	DeviceManager &devman = DeviceManager::getInstance();
@@ -31,55 +26,51 @@ int main() {
 		progress.info("%s", info.c_str());
 	}
 
+	Image img("D:/elisaveta.JPG");
+
 	Device &d = devman.getDevice(0);
 	d.makeCurrent();
-	d.setSource("D:/code/devman_full/devman/gpu_code/kernel.ptx");
+	d.setSource("D:/code/devman_full/devman/gpu_code/greyscale.ptx");
 
-	DeviceBuffer buffA;
-	DeviceBuffer buffB;
-	DeviceBuffer buffC;
-	initBuffer(buffA);
-	initBuffer(buffB);
-	initBuffer(buffC);
+	DeviceBuffer buffIn;
+	DeviceBuffer buffOut;
 
-	Kernel kernelGlobal("dummyGlobal", d.getProgram());
-	kernelGlobal.addParamPtr(buffA.get());
-	kernelGlobal.addParamPtr(buffB.get());
-	kernelGlobal.addParamPtr(buffC.get());
+	const int64 buffSize = img.getMemUsage();
+	buffIn.alloc(buffSize);
+	buffOut.alloc(buffSize);
 
 	ThreadData tData(d);
-	Timer t;
-	tData.launch(kernelGlobal, WIDTH*WIDTH);
+
+	//Remove the context from the stack. We no longer need it
+	CUcontext ctx=0;
+	cuCtxGetCurrent(&ctx);
+	cuCtxPopCurrent(NULL);
+	cuCtxGetCurrent(&ctx);
+
+
+	Kernel kernelGlobal("greyscale", d.getProgram());
+	kernelGlobal.addParamPtr(buffIn.get());
+	kernelGlobal.addParamPtr(buffOut.get());
+
+	Timer elapsedTimer;
+
+	Color* data = img.getData();
+	CUstream stream = tData.getStream();
+	buffIn.uploadAsync(data, buffSize, stream);
+	tData.launch(kernelGlobal, img.getWidth() * img.getHeight());
+	buffOut.downloadAsync(data, stream);
+	
 	tData.wait();
-	const int64 globalTime = t.elapsed(Timer::Precision::Nanoseconds);
-	progress.info("Global Kernel took %lld ns", globalTime);
+	const int64 globalTime = elapsedTimer.elapsed(Timer::Precision::Milliseconds);
+	progress.info("Global Kernel took %lld ms", globalTime);
 
-	buffC.download(arr);
 
-	for (int i = 0; i < 10; i++) {
-		printf("%d ", arr[i]);
-	}
-	printf("\n");
+	elapsedTimer.restart();
+	img.save("output.png", nullptr);//&threadman
+	const int64 saving = elapsedTimer.elapsed(Timer::Precision::Milliseconds);
+	progress.info("Image save took %lld ms", saving);
 
-	Kernel kernelShared("dummyShared", d.getProgram());
-	kernelShared.addParamPtr(buffA.get());
-	kernelShared.addParamPtr(buffB.get());
-	kernelShared.addParamPtr(buffC.get());
-
-	t.restart();
-	tData.launch(kernelShared, WIDTH*WIDTH);
-	tData.wait();
-	const int64 sharedTime = t.elapsed(Timer::Precision::Nanoseconds);
-	progress.info("Shared Kernel took %lld ns", sharedTime);
-
-	buffC.download(arr);
-
-	for (int i = 0; i < 10; i++) {
-		printf("%d ", arr[i]);
-	}
-	printf("\n");
-
-	progress.info("Shared kernel is %lf times faster", double(globalTime)/double(sharedTime));
-
+	//Restore the context so deinitialization may pass
+	d.makeCurrent();
 	return 0;
 }

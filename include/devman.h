@@ -261,6 +261,8 @@ struct ThreadData {
 
 	// Frees all resources owned. Safe to be called multile times
 	void freeMem();
+
+	CUstream getStream() const;
 private:
 	Device &device;  // Reference to the device on which we launch
 	CUstream stream; // The cuda stream used for async lauches

@@ -26,7 +26,7 @@ else
 		echo "Setting up variables for Windows (Git Bash)"
 
 		export INCLUDES=(-I"../include")
-		export NVCC="/c/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v9.0/bin/nvcc"
+		export NVCC="/c/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v10.1/bin/nvcc"
 		export COMPILER="/c/Program Files (x86)/Microsoft Visual Studio 14.0/VC/bin/amd64"
 	else
 		echo "Unsupported OS : ${machine}"
@@ -38,4 +38,4 @@ echo "C++ compiler currently set: $COMPILER"
 
 export NVCC_FLAGS="-m64 --use_fast_math -cudart static --gpu-architecture=compute_30 --gpu-code=sm_30,compute_30 -O0 --maxrregcount=64 "
 
-exec "$NVCC" $NVCC_FLAGS -ccbin "$COMPILER" "${INCLUDES[@]}" -ptx -o kernel.ptx  kernel.cu >> cudaoutput.txt | tee
+exec "$NVCC" $NVCC_FLAGS -ccbin "$COMPILER" "${INCLUDES[@]}" -ptx -o greyscale.ptx  greyscale.cu >> cudaoutput.txt | tee
