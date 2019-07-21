@@ -17,7 +17,7 @@ esac
 if [ "${machine}" == "Linux" ]
 then
 	echo "Setting up variables for Linux"
-	export INCLUDES=""
+	export INCLUDES="-I../include"
 	export NVCC="/usr/local/cuda/bin/nvcc"
 	export COMPILER="g++"
 else 

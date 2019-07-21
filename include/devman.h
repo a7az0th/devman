@@ -23,7 +23,7 @@ public:
 	friend struct Device;
 	friend struct ThreadData;
 
-	DeviceBuffer(std::string& name=std::string("unnamed"), int emulate=0): 
+	DeviceBuffer(std::string name=std::string("unnamed"), int emulate=0): 
 		name(name), 
 		emulate(emulate), 
 		buffer(NULL), 

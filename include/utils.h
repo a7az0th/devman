@@ -36,7 +36,7 @@
 template<class T>
 struct Buffer {
 	CONSTRUCTOR Buffer() : buff(nullptr), size(0) {}
-	CONSTRUCTOR Buffer(T* ptr, int size) : ptr(ptr), size(size) {}
+	CONSTRUCTOR Buffer(T* ptr, int size) : buff(ptr), size(size) {}
 	DESTRUCTOR ~Buffer() {} //We dont own the memory so do nothing
 
 	TEMPLATE T* ptr() const {

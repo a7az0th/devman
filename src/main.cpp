@@ -30,8 +30,11 @@ int main() {
 
 	Device &d = devman.getDevice(0);
 	d.makeCurrent();
+#ifdef WIN32
 	d.setSource("D:/code/devman_full/devman/gpu_code/greyscale.ptx");
-
+#else
+	d.setSource("/home/a7az0th/code/devman/gpu_code/greyscale.ptx");
+#endif
 	DeviceBuffer buffIn;
 	DeviceBuffer buffOut;
 
