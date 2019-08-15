@@ -26,7 +26,7 @@ else
 		echo "Setting up variables for Windows (Git Bash)"
 
 		export INCLUDES=(-I"../include")
-		export NVCC="/c/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v10.1/bin/nvcc"
+		export NVCC="/c/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v10.0/bin/nvcc"
 		export COMPILER="/c/Program Files (x86)/Microsoft Visual Studio 14.0/VC/bin/amd64"
 	else
 		echo "Unsupported OS : ${machine}"

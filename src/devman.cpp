@@ -24,43 +24,6 @@ if ((err) != CUDA_SUCCESS) {                                   \
 	return (err);                                             \
 }
 
-int pushContext(int emulate, CUcontext& ctx, CUresult& err) {
-	err = CUDA_SUCCESS;
-
-	if (emulate) return false;
-
-	CUcontext current = nullptr;
-	err = cuCtxGetCurrent(&current);
-	if (err != CUDA_SUCCESS) {
-		return false;
-	}
-
-	if (current == ctx) {
-		return false;
-	} else {
-		err = cuCtxPushCurrent(ctx);
-		if (err != CUDA_SUCCESS) {
-			return false;
-		} else {
-			return true;
-		}
-	}
-}
-
-void popContext(int needPop) {
-	if (needPop) {
-		cuCtxPopCurrent(NULL);
-	}
-}
-
-struct PushContextRAII {
-public:
-	PushContextRAII(int modeCPU, CUcontext& ctx, CUresult& err) { needPop = pushContext(modeCPU, ctx, err); }
-	~PushContextRAII() { popContext(needPop); }
-private:
-	int needPop;
-};
-
 /////////////////////////////////////////////////////////////////////////////////
 
 DeviceManager::DeviceManager() : initialized(0), numDevices(0) {}
@@ -193,7 +156,7 @@ int DeviceManager::getDeviceInfo(int deviceIndex, Device &devInfo) {
 
 
 int DeviceBuffer::free() {
-	GPUResult err = GPU_SUCCESS;	
+	GPUResult err = GPU_SUCCESS;
 	if (buffer) {
 		if (emulate) {
 			const char* handle = static_cast<char*>(buffer);

@@ -54,7 +54,7 @@ source_group("GPU Code" FILES ${GPU_SOURCE})
 target_link_libraries(${PROJECT_NAME} ${CMAKE_DL_LIBS})
 target_link_libraries(${PROJECT_NAME} utils)
 target_link_libraries(${PROJECT_NAME} freeimage)
-target_link_libraries(${PROJECT_NAME} pthread)
+#target_link_libraries(${PROJECT_NAME} pthread)
 
 #install(TARGETS devman DESTINATION bin)
 

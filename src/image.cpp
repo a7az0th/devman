@@ -69,8 +69,17 @@ Image::Image(const std::string & fileName) {
 	}
 	minValue = Color(1e12f, 1e12f, 1e12f);
 	maxValue = Color(0.f, 0.f, 0.f);
-	loadFromFile(fileName);
-	own = 1;
+	width = 0;
+	height = 0;
+	colorSize = 0;
+	if (-1 == loadFromFile(fileName)) {
+		valid = 0;
+		own = 0;
+		data = nullptr;
+	} else {
+		valid = 1;
+		own = 1;
+	}
 }
 
 inline void Image::freeImage() {
@@ -273,7 +282,7 @@ int Image::save(const std::string &fileName, a7az0th::ThreadManager *threadman) 
 		}
 	}
 	a7az0th::int64 elapsedTime = elapsed.elapsed(a7az0th::Timer::Precision::Milliseconds);
-	printf("Image conversion took %d ms\n", elapsedTime);
+	printf("Image conversion took %lld ms\n", elapsedTime);
 
 	FreeImage_Save(FIF_PNG, dib, fileName.c_str());
 	FreeImage_Unload(dib);

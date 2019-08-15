@@ -9,7 +9,14 @@
 
 using namespace a7az0th;
 
-
+void resetContexts() {
+	CUcontext ctx=0;
+	do {
+		cuCtxGetCurrent(&ctx);
+		cuCtxPopCurrent(NULL);
+		cuCtxGetCurrent(&ctx);
+	} while (ctx);
+}
 
 int main() {
 	const int numThreads = getProcessorCount();
@@ -26,54 +33,74 @@ int main() {
 		progress.info("%s", info.c_str());
 	}
 
-	Image img("D:/elisaveta.JPG");
-
-	Device &d = devman.getDevice(0);
-	d.makeCurrent();
-#ifdef WIN32
-	d.setSource("D:/code/devman_full/devman/gpu_code/greyscale.ptx");
-#else
-	d.setSource("/home/a7az0th/code/devman/gpu_code/greyscale.ptx");
-#endif
-	DeviceBuffer buffIn;
-	DeviceBuffer buffOut;
-
+	Image img("D:/Tamara-2.jpg");
 	const int64 buffSize = img.getMemUsage();
-	buffIn.alloc(buffSize);
-	buffOut.alloc(buffSize);
 
-	ThreadData tData(d);
+#ifdef WIN32
+	std::string ptxFile("D:/code/devman/gpu_code/greyscale.ptx");
+#else
+	std::string ptxFile("/home/a7az0th/code/devman/gpu_code/greyscale.ptx");
+#endif
 
-	//Remove the context from the stack. We no longer need it
-	CUcontext ctx=0;
-	cuCtxGetCurrent(&ctx);
-	cuCtxPopCurrent(NULL);
-	cuCtxGetCurrent(&ctx);
+	struct DevData {
+		DeviceBuffer buffIn;
+		DeviceBuffer buffOut;
+		ThreadData *tData;
 
+		DevData() : tData(nullptr) {}
+		~DevData() { delete tData; }
+	};
 
-	Kernel kernelGlobal("greyscale", d.getProgram());
-	kernelGlobal.addParamPtr(buffIn.get());
-	kernelGlobal.addParamPtr(buffOut.get());
+	DevData deviceData[3];
+
+	for (int i = 0; i < devman.getDeviceCount(); i++) {
+		Device &d = devman.getDevice(i);
+		DevData &devData = deviceData[i];
+
+		d.makeCurrent();
+		d.setSource(ptxFile);
+
+		devData.buffIn.alloc(buffSize);
+		devData.buffOut.alloc(buffSize);
+		devData.tData = new ThreadData(d);
+	}
+
+	resetContexts();
+
+	for (int i = 0; i < devman.getDeviceCount(); i++) {
+
+		Device &d = devman.getDevice(i);
+		DevData &devData = deviceData[i];
+		ThreadData &tData = *devData.tData;
+
+		Kernel kernelGlobal("greyscale", d.getProgram());
+		kernelGlobal.addParamPtr(devData.buffIn.get());
+		kernelGlobal.addParamPtr(devData.buffOut.get());
+
+		Timer elapsedTimer;
+
+		Color* data = img.getData();
+		CUstream stream = tData.getStream();
+		devData.buffIn.uploadAsync(data, buffSize, stream);
+		tData.launch(kernelGlobal, img.getWidth() * img.getHeight());
+		//buffOut.downloadAsync(data, stream);
+
+		const int64 globalTime = elapsedTimer.elapsed(Timer::Precision::Milliseconds);
+		progress.info("Global Kernel took %lld ms", globalTime);
+	}
+
+	for (int i = 0; i < devman.getDeviceCount(); i++) {
+		DevData &devData = deviceData[i];
+		ThreadData &tData = *devData.tData;
+		tData.wait();
+	}
 
 	Timer elapsedTimer;
-
-	Color* data = img.getData();
-	CUstream stream = tData.getStream();
-	buffIn.uploadAsync(data, buffSize, stream);
-	tData.launch(kernelGlobal, img.getWidth() * img.getHeight());
-	buffOut.downloadAsync(data, stream);
-	
-	tData.wait();
-	const int64 globalTime = elapsedTimer.elapsed(Timer::Precision::Milliseconds);
-	progress.info("Global Kernel took %lld ms", globalTime);
-
-
-	elapsedTimer.restart();
 	img.save("output.png", nullptr);//&threadman
 	const int64 saving = elapsedTimer.elapsed(Timer::Precision::Milliseconds);
 	progress.info("Image save took %lld ms", saving);
 
 	//Restore the context so deinitialization may pass
-	d.makeCurrent();
+	//d.makeCurrent();
 	return 0;
 }
