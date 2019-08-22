@@ -1,11 +1,16 @@
 #include "progress.h"
+#include <chrono>
 
 std::string ProgressCallback::getTimestamp() {
 
-	time_t currentTime;
-	time( &currentTime ); // Get the current time
+	auto now = std::chrono::system_clock::now();
+	auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
 
-	struct tm* localTime; 
+	time_t currentTime = std::chrono::system_clock::to_time_t(now);
+
+	const int Millis = ms % 1000;
+
+	struct tm* localTime;
 	localTime = localtime(&currentTime); // Convert the current time to the local time
 
 	//[2016/01/08-23:12:04.43]
@@ -17,7 +22,7 @@ std::string ProgressCallback::getTimestamp() {
 	const int Sec    = localTime->tm_sec;
 
 	char fileName[256];
-	sprintf(fileName, "%04d/%02d/%02d-%02d:%02d:%02d.00", Year, Month, Day, Hour, Min, Sec);
+	sprintf(fileName, "%04d/%02d/%02d-%02d:%02d:%02d.%03d", Year, Month, Day, Hour, Min, Sec, Millis);
 	return fileName;
 }
 
