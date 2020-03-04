@@ -348,7 +348,7 @@ ErrorCode queryNVLinkConnectedComponents(a7az0th::Device* devices, int numDevice
 		}
 
 		if (!found) {
-			progress.info("  Device[0] has no NVLink connections");
+			progress.info("  Device[%d] has no NVLink connections", d);
 		}
 	}
 
