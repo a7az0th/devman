@@ -115,6 +115,7 @@ struct Device {
 		int busId;                //< Index of the PCI bus on which the device is mounted
 		int tccMode;              //< True if device is running in Tesla Compute Cluster mode
 		int clockRate;            //< Device clock rate in MHz
+		unsigned nvLink;          //< A bitmask, the position of every high bit marks the device index from which we can read memory
 
 		Params() :
 			name("Unknown"),
@@ -130,7 +131,8 @@ struct Device {
 			devId(-1),
 			busId(-1),
 			tccMode(-1),
-			clockRate(-1)
+			clockRate(-1),
+			nvLink(0)
 		{}
 	} params;
 

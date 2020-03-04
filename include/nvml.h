@@ -9,4 +9,4 @@ namespace a7az0th {
 
 ErrorCode getDriverVersionWithNVML(std::string &driverVersion);
 
-ErrorCode queryNVLinkConnectedComponents(a7az0th::Device* devices, int numDevices, ProgressCallback &progress);
+ErrorCode queryNVLinkConnectedComponents(a7az0th::Device* devices, int numDevices);

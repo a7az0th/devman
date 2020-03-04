@@ -283,7 +283,7 @@ std::string getDevicePCIID(const int deviceID) {
 }
 
 
-ErrorCode queryNVLinkConnectedComponents(a7az0th::Device* devices, int numDevices, ProgressCallback &progress) {
+ErrorCode queryNVLinkConnectedComponents(a7az0th::Device* devices, int numDevices) {
 
 	LibHandle hMod = nullptr;
 	const int res = initNVML(hMod);
@@ -294,24 +294,14 @@ ErrorCode queryNVLinkConnectedComponents(a7az0th::Device* devices, int numDevice
 	nvmlReturn_t err;
 	err = nvmlInitialize();
 
-
-	nvmlDevice_t nvmlDevices[16];
-	std::string pciid[16];
-	for (int i = 0; i < numDevices; i++) {
-		nvmlDevices[i] = getNvmlDeviceByIndex(devices[i].params.devId);
-		pciid[i] = getDevicePCIID(devices[i].params.devId);
-	}
-
 	/// There are total of 6 maximum NVLink islands as of Mar.2020 so we loop on all of them.
 	/// We find the link on which our current device is on
 	/// Then we loop through all the other devices and look whether any of them has the same PCI ID
 	/// Apparently this is what tells us whether they are in an NVLink connection
 	const int NVML_NVLINK_MAX_LINKS = 6;
 	for (int d = 0; d < numDevices; d++) {
-		progress.info("Querying device[%d] for NVLink...", d);
 		bool found = false;
-		nvmlDevice_t device = nvmlDevices[d];
-		std::string localPciId = pciid[d];
+		nvmlDevice_t device = getNvmlDeviceByIndex(devices[d].params.devId);
 
 		for (int link = 0; link < NVML_NVLINK_MAX_LINKS; ++link) {
 			unsigned int isSupported = 0;
@@ -340,15 +330,10 @@ ErrorCode queryNVLinkConnectedComponents(a7az0th::Device* devices, int numDevice
 				const int deviceID = devices[i].params.devId;
 				const std::string pci = getDevicePCIID(deviceID);
 				if (pci == peerPciId) {
-					progress.info("  Device[%d] is connected to Device[%d] on link %d", d, i, link);
-					found = true;
+					devices[d].params.nvLink |= 1 << deviceID;
 					break;
 				}
 			}
-		}
-
-		if (!found) {
-			progress.info("  Device[%d] has no NVLink connections", d);
 		}
 	}
 

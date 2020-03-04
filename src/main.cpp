@@ -49,9 +49,23 @@ int main(int argc, char *argv[]) {
 	}
 
 	Device* devices = &devman.getDevice(0);
-	err = queryNVLinkConnectedComponents(devices, numDevices, progress);
+	err = queryNVLinkConnectedComponents(devices, numDevices);
 	if (err.error()) {
 		progress.error("%s",err.getError().ptr());
+	}
+
+	for (int i = 0; i < numDevices; i++) {
+		progress.info("Querying device[%d] for NVLink...", i);
+		const unsigned nvLink = devices[i].params.nvLink;
+		if (nvLink) {
+			for (int j = 0; j < numDevices; j++) {
+				if (nvLink & 1<<j) {
+					progress.info("  Device[%d] is connected to Device[%d]", i, j);
+				}
+			}
+		} else {
+			progress.info("  Device[%d] has no NVLink connections", i);
+		}
 	}
 	return 0;
 }
