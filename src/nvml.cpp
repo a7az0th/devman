@@ -308,7 +308,7 @@ ErrorCode queryNVLinkConnectedComponents(a7az0th::Device* devices, int numDevice
 	/// Apparently this is what tells us whether they are in an NVLink connection
 	const int NVML_NVLINK_MAX_LINKS = 6;
 	for (int d = 0; d < numDevices; d++) {
-		progress.info("Querying device[%d]", d);
+		progress.info("Querying device[%d] for NVLink...", d);
 		bool found = false;
 		nvmlDevice_t device = nvmlDevices[d];
 		std::string localPciId = pciid[d];
@@ -340,7 +340,7 @@ ErrorCode queryNVLinkConnectedComponents(a7az0th::Device* devices, int numDevice
 				const int deviceID = devices[i].params.devId;
 				const std::string pci = getDevicePCIID(deviceID);
 				if (pci == peerPciId) {
-					progress.info("Device[%d] is connected to Device[%d] on link %d", d, i, link);
+					progress.info("  Device[%d] is connected to Device[%d] on link %d", d, i, link);
 					found = true;
 					break;
 				}
@@ -348,7 +348,7 @@ ErrorCode queryNVLinkConnectedComponents(a7az0th::Device* devices, int numDevice
 		}
 
 		if (!found) {
-			progress.info("(no nvlink)");
+			progress.info("  Device[0] has no NVLink connections");
 		}
 	}
 
