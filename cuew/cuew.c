@@ -86,6 +86,7 @@ tcuDevicePrimaryCtxRelease *cuDevicePrimaryCtxRelease;
 tcuDevicePrimaryCtxSetFlags *cuDevicePrimaryCtxSetFlags;
 tcuDevicePrimaryCtxGetState *cuDevicePrimaryCtxGetState;
 tcuDevicePrimaryCtxReset *cuDevicePrimaryCtxReset;
+tcuDeviceGetUuid *cuDeviceGetUuid;
 tcuCtxCreate_v2 *cuCtxCreate_v2;
 tcuCtxDestroy_v2 *cuCtxDestroy_v2;
 tcuCtxPushCurrent_v2 *cuCtxPushCurrent_v2;
@@ -394,6 +395,7 @@ static int cuewCudaInit(void) {
   CUDA_LIBRARY_FIND(cuDevicePrimaryCtxSetFlags);
   CUDA_LIBRARY_FIND(cuDevicePrimaryCtxGetState);
   CUDA_LIBRARY_FIND(cuDevicePrimaryCtxReset);
+  CUDA_LIBRARY_FIND(cuDeviceGetUuid);
   CUDA_LIBRARY_FIND(cuCtxCreate_v2);
   CUDA_LIBRARY_FIND(cuCtxDestroy_v2);
   CUDA_LIBRARY_FIND(cuCtxPushCurrent_v2);
