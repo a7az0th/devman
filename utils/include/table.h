@@ -48,6 +48,26 @@ public:
 	T* begin() { return &container[0]; }
 	T* end() { return &container[0] + container.size(); }
 
+	int find(const T &value) const {
+		for (int i = 0; i < container.size(); i++) {
+			if (container[i] == value) {
+				return i;
+			}
+		}
+		return -1;
+	}
+
+	void eraseKeepOrder(int idx) {
+		container.erase(container.begin() + idx);
+	}
+
+	void copy(const Table<T> &rhs) {
+		//container = rhs.container;
+		container.resize(rhs.container.size());
+		for (int i = 0; i < rhs.container.size(); i++) {
+			container[i] = rhs.container[i];
+		}
+	}
 private:
 	std::vector<T> container;
 };

@@ -284,7 +284,7 @@ int Image::save(const std::string &fileName, a7az0th::ThreadManager *threadman) 
 	a7az0th::int64 elapsedTime = elapsed.elapsed(a7az0th::Timer::Precision::Milliseconds);
 	printf("Image conversion took %lld ms\n", elapsedTime);
 
-	FreeImage_Save(FIF_PNG, dib, fileName.c_str());
+	FreeImage_Save(FIF_JPEG, dib, fileName.c_str());
 	FreeImage_Unload(dib);
 	return 0;
 }

@@ -15,13 +15,16 @@ if (WIN32)
 	link_directories (
 		${PROJECT_SOURCE_DIR}/sdk/FreeImage/lib
 	)
+	add_definitions(-D_CRT_SECURE_NO_WARNINGS)
 else()
 	include_directories(
-		/media/a7az0th/LinuxData/FreeImage/Source
+		/media/alexander/LinuxData/FreeImage/Source
 	)
 	link_directories(
-		/media/a7az0th/LinuxData/FreeImage/Dist
+		/media/alexander/LinuxData/FreeImage/Dist
 	)
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -o0")
 endif()
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
@@ -30,12 +33,15 @@ set(HEADERS
 	include/utils.h
 	include/devman.h
 	include/image.h
+	include/nvml.h
+	include/version.h
 )
 
 set(SOURCES
 	src/main.cpp
 	src/devman.cpp
 	src/image.cpp
+	src/nvml.cpp
 	cuew/cuew.c
 )
 
@@ -54,7 +60,9 @@ source_group("GPU Code" FILES ${GPU_SOURCE})
 target_link_libraries(${PROJECT_NAME} ${CMAKE_DL_LIBS})
 target_link_libraries(${PROJECT_NAME} utils)
 target_link_libraries(${PROJECT_NAME} freeimage)
-#target_link_libraries(${PROJECT_NAME} pthread)
+if (UNIX)
+	target_link_libraries(${PROJECT_NAME} pthread)
+endif()
 
 #install(TARGETS devman DESTINATION bin)
 

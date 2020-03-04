@@ -91,6 +91,11 @@ int DeviceManager::getDeviceInfo(int deviceIndex, Device &devInfo) {
 	checkError(err);
 	devInfo.handle = device;
 
+	char pciBusId[256];
+	err = cuDeviceGetPCIBusId(pciBusId, 256, device);
+	checkError(err);
+	devInfo.params.pciBusId = std::string(pciBusId);
+
 	char name[256];
 	err = cuDeviceGetName(name, 256, device);
 	checkError(err);
@@ -267,6 +272,7 @@ std::string Device::getInfo() const {
 	const int buffSize = 1024;
 	char buff[buffSize];
 	snprintf(buff, buffSize, "Device[%d] is : %s\n\n", params.devId, params.name.c_str()); message += buff;
+	snprintf(buff, buffSize, "\tPCI Bus ID                     : %s\n", params.pciBusId.c_str());  message += buff;
 	snprintf(buff, buffSize, "\tDriver mode                    : %s\n", driverMode.c_str());  message += buff;
 	snprintf(buff, buffSize, "\tClock Rate                     : %dMhz\n", params.clockRate/1000);   message += buff;
 	snprintf(buff, buffSize, "\tTotal global memory            : %.1f GB\n", totalMemory);    message += buff;
@@ -330,8 +336,8 @@ GPUResult Device::setSource(const std::string& ptxFile) {
 //////////////////////////////////////////////////////////////////////////////
 
 Kernel::Kernel(std::string name, CUmodule program): 
-	function(nullptr), 
-	offset(0), 
+	function(nullptr),
+	offset(0),
 	numParams(0)
 {
 	CUresult err = CUDA_SUCCESS;

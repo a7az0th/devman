@@ -102,6 +102,7 @@ struct Device {
 	//Parameters
 	struct Params {
 		std::string name;         //< Name of the device as returned by the CUDA API
+		std::string pciBusId;     //< Identifier of the PCI lane on which this device resides
 		size_t memory;            //< Total memory in bytes
 		size_t sharedMemPerBlock; //< Total shared memory per block in bytes
 		int ccmajor;              //< CUDA Compute Capability major version number
@@ -117,6 +118,7 @@ struct Device {
 
 		Params() :
 			name("Unknown"),
+			pciBusId(""),
 			memory(0),
 			sharedMemPerBlock(0),
 			ccmajor(-1),
@@ -139,6 +141,10 @@ struct Device {
 
 	CUmodule getProgram() const {
 		return program;
+	}
+
+	CUdevice& getHandle() {
+		return handle;
 	}
 
 	void makeCurrent() const {
