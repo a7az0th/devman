@@ -73,6 +73,7 @@ Device& DeviceManager::getDevice(int index) {
 }
 
 int DeviceManager::deinit() {
+	devices.clear();
 	initialized = 0;
 	numDevices = 0;
 	GPUResult err = GPU_SUCCESS;
@@ -181,12 +182,13 @@ int DeviceBuffer::alloc(size_t size) {
 	if (buffer) {
 		free();
 	}
-
-	if (emulate) {
-		buffer = new char[size];
-	} else {
-		err = cuMemAlloc((CUdeviceptr*)&buffer, size);
-		assert(err == CUDA_SUCCESS);
+	if (size != 0) {
+		if (emulate) {
+			buffer = new char[size];
+		} else {
+			err = cuMemAlloc((CUdeviceptr*)&buffer, size);
+			assert(err == CUDA_SUCCESS);
+		}
 	}
 	this->size = size;
 	return err != GPU_SUCCESS;
@@ -287,7 +289,7 @@ std::string Device::getInfo() const {
 	return message;
 }
 
-GPUResult Device::setSource(const std::string& ptxFile) {
+GPUResult Device::setSource(const std::string& ptxFile, const CompileOptions &opts) {
 	assert(context != nullptr);
 
 	std::string ptxSource = getFileContents(ptxFile);
@@ -297,13 +299,25 @@ GPUResult Device::setSource(const std::string& ptxFile) {
 	char errorBuffer[bufferSize];
 
 	const int optimizationLevel = 4;
+	const int lineInfo = 0;
 
 	int numOptions = 0;
 	CUjit_option options[20];
 	void* optionValues[20];
 
+	maxThreads = opts.maxThreads;
+
+	const int64_t maxRegisters= 65536 / maxThreads;
+	options[numOptions] = CU_JIT_MAX_REGISTERS;
+	optionValues[numOptions] = (void*)maxRegisters;
+	numOptions++;
+
 	options[numOptions] = CU_JIT_OPTIMIZATION_LEVEL;
 	optionValues[numOptions] = (void*)optimizationLevel;
+	numOptions++;
+
+	options[numOptions] = CU_JIT_GENERATE_LINE_INFO;
+	optionValues[numOptions] = (void*)lineInfo;
 	numOptions++;
 
 	// set up size of compilation log buffer
@@ -335,7 +349,7 @@ GPUResult Device::setSource(const std::string& ptxFile) {
 
 //////////////////////////////////////////////////////////////////////////////
 
-Kernel::Kernel(std::string name, CUmodule program): 
+Kernel::Kernel(const std::string &name, CUmodule program): 
 	function(nullptr),
 	offset(0),
 	numParams(0)
@@ -371,6 +385,10 @@ void Kernel::addParamInt(int i) {
 	offset += size;
 }
 
+void Kernel::reset() {
+	numParams = 0;
+	offset = 0;
+}
 //////////////////////////////////////////////////////////////////////////////
 
 ThreadData::ThreadData(Device& device): 
@@ -405,9 +423,8 @@ CUresult ThreadData::launch(const Kernel& ker, const int workSize) {
 	CUresult err = CUDA_SUCCESS;
 	const int sharedMem = 0;
 
-	int threadsPerBlock = 1024;
+	const int threadsPerBlock = device.getMaxThreads();
 	const int numBlocks = (workSize + (threadsPerBlock-1)) / threadsPerBlock;
-	threadsPerBlock = workSize / numBlocks;
 
 	err = cuLaunchKernel(ker.function,
 		numBlocks, 1, 1,
@@ -421,11 +438,11 @@ CUresult ThreadData::launch(const Kernel& ker, const int workSize) {
 	return err;
 }
 
-void ThreadData::wait() const {
+int ThreadData::wait() const {
 	CUresult err = CUDA_SUCCESS;
 	err = cuStreamSynchronize(stream);
 	assert(err == CUDA_SUCCESS);
-	return;
+	return err;
 }
 //////////////////////////////////////////////////////////////////////////////
 std::string getFileContents(const std::string& file) {

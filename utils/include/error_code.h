@@ -1,19 +1,31 @@
 #pragma once
 
-#include "charstring.h"
+#include <string>
 #include <assert.h>
 
 struct ErrorCode {
 public:
 	ErrorCode(): errorFlag(0), errorCode(0) {}
-	ErrorCode(const char* functionName, const int errorCode, const CharString &message): errorFlag(1), functionName(functionName), errorMessage(message), errorCode(errorCode) {
-		assert(false);
+	ErrorCode(const char* functionNamePtr, const int errorCode, const char* message): 
+		errorFlag(1), errorCode(errorCode) 
+	{
+		if (functionNamePtr) {
+			functionName = functionNamePtr; 
+		}
+		if (message) {
+			errorMessage = message;
+		}
+		//assert(false);
 	}
 
-	CharString getError() {
+	std::string getError() {
 		char str[256];
-		sprintf(str, "%s: %s (%d)", functionName.ptr(), errorMessage.ptr(), errorCode);
-		return CharString(str);
+		if (functionName.length() > 0) {
+			sprintf(str, "%s: %s (Code: %d)", functionName.c_str(), errorMessage.c_str(), errorCode);
+		} else {
+			sprintf(str, "%s (Code: %d)", errorMessage.c_str(), errorCode);
+		}
+		return std::string(str);
 	}
 	~ErrorCode() {}
 	bool error() { return errorFlag; }
@@ -22,6 +34,6 @@ private:
 	//Parameters:
 	int errorCode;
 	bool errorFlag;
-	CharString functionName;
-	CharString errorMessage;
+	std::string functionName;
+	std::string errorMessage;
 };

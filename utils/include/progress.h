@@ -4,13 +4,17 @@
 #include <string>
 #include <time.h>
 
+namespace a7az0th {
+
 struct ProgressCallback {
 public:
 	enum class LogLevel {
-		error,
+		lowest,
+		error = lowest,
 		warning,
 		info,
 		debug,
+		highest = debug
 	};
 
 	// Create a default progress. Log level is set to Info
@@ -20,10 +24,10 @@ public:
 	~ProgressCallback();
 
 	// Write a message in the specified layer
-	void debug(const char *format, ...);
-	void info(const char *format, ...);
-	void error(const char *format, ...);
-	void warning(const char *format, ...);
+	void debug(const char *format, ...) const;
+	void info(const char *format, ...) const;
+	void error(const char *format, ...) const;
+	void warning(const char *format, ...) const;
 
 	// Set logging level to @loggingLevel
 	void setLogLevel(LogLevel loggingLevel);
@@ -32,3 +36,5 @@ private:
 	//Parameters:
 	LogLevel logLevel;
 };
+
+}

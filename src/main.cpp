@@ -19,39 +19,45 @@ void resetContexts() {
 	} while (ctx);
 }
 
+void launchWork(DeviceManager &devman, ThreadManager &threadman, ProgressCallback &progress) {
+
+}
+
 int main(int argc, char *argv[]) {
-	printUsage();
+	ThreadManager threadman;
 	ProgressCallback progress;
-#ifdef _DEBUG
-	if (argc > 1) {
-		progress.info("Entering debug loop...");
-		while (true) {
-			int a = 5;
-		}
-	}
-#endif
+	progress.setLogLevel(ProgressCallback::LogLevel::debug);
+	printVersion(progress);
 	std::string driverVersion;
 	ErrorCode err = getDriverVersionWithNVML(driverVersion);
 	if (err.error()) {
-		progress.error("%s",err.getError().ptr());
+		progress.error("%s",err.getError().c_str());
 	} else {
 		progress.info("NVidia driver version: %s", driverVersion.c_str());
 	}
 
 	DeviceManager &devman = DeviceManager::getInstance();
 	const int numDevices = devman.getDeviceCount();
-	progress.info("%d devices found", numDevices);
+	progress.info("%d device(s) found", numDevices);
 
 	for (int i = 0; i < numDevices; i++) {
 		Device &d = devman.getDevice(i);
-		std::string info = d.getInfo();
-		progress.info("%s", info.c_str());
+		progress.info("Device[%d] : %s | SM:%2d | TCC:%d | CC:%d.%d | Freq:%d | Mem:%.1fGB",
+			i,
+			d.params.name.c_str(),
+			d.params.multiProcessorCount,
+			d.params.tccMode,
+			d.params.ccmajor,
+			d.params.ccminor,
+			d.params.clockRate / 1000,
+			float(d.params.memory) / float(1024 * 1024 * 1024)
+		);
 	}
 
 	Device* devices = &devman.getDevice(0);
 	err = queryNVLinkConnectedComponents(devices, numDevices);
 	if (err.error()) {
-		progress.error("%s",err.getError().ptr());
+		progress.error("%s",err.getError().c_str());
 	}
 
 	for (int i = 0; i < numDevices; i++) {
@@ -67,5 +73,8 @@ int main(int argc, char *argv[]) {
 			progress.info("  Device[%d] has no NVLink connections", i);
 		}
 	}
+	devman.deinit();
+
+	launchWork(devman, threadman, progress);
 	return 0;
 }

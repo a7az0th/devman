@@ -11,7 +11,6 @@ namespace a7az0th {
 	// How many CPUs we support
 	const int MAX_CPU_COUNT = 64;
 
-
 	// Return the number of processors available on the system
 	static int getProcessorCount(void) {
 		const int cpu_count = std::thread::hardware_concurrency();
@@ -56,23 +55,18 @@ namespace a7az0th {
 		void wait(void) {
 			std::unique_lock<std::mutex> lk(m);
 			c.wait(lk);
-			lk.unlock();
 		}
 		// Release one waiting thread
 		void signal(void) {
 			std::unique_lock<std::mutex> lk(m);
 			c.notify_one();
-			lk.unlock();
 		}
 		// Release all waiting threads
 		void signalAll(void) {
 			std::unique_lock<std::mutex> lk(m);
 			c.notify_all();
-			lk.unlock();
-
 		}
 	};
-
 
 	struct ThreadManager;
 
@@ -143,7 +137,6 @@ namespace a7az0th {
 		bool workComplete;        // A flag indicating that all worker threads have finished
 		std::atomic<int> counter; // An atomic counter. Determines the number of currently working threads. Used to signal the main thread when all work is done
 		Event waitForThreads;     // A wait condifion. The threadmanager waits on this while the threads are working.
-		//volatile ThreadState state; // The state of the threadman main thread.
 
 		// Spawned threads enter here.
 		// When a thread comes here it will enter idle state and wait for the thread manager to release it.
@@ -167,31 +160,31 @@ namespace a7az0th {
 				// The thread has been awoken!
 				// When the thread manager wakes a thread, it will set its state to RUNNING
 				switch (info->state) {
-				case THREAD_RUNNING: {
-					// If we have a job, do it
-					MultiThreaded *job = info->algorithm;
+					case THREAD_RUNNING: {
+						// If we have a job, do it
+						MultiThreaded *job = info->algorithm;
 
-					if (job) {
-						job->threadProc(info->index, info->numThreads);
+						if (job) {
+							job->threadProc(info->index, info->numThreads);
+						}
+
+						// After the job is done, decrease the global counter
+						// keeping track of the threads that are currently running.
+						if (0 == --cnt) {
+							// If this is the last threads
+							// Signal the thread manager that the main thread can continue.
+							*info->jobsDone = true;
+							info->releaseMainThread->signal();
+						}
+						break;
 					}
 
-					// After the job is done, decrease the global counter
-					// keeping track of the threads that are currently running.
-					if (0 == --cnt) {
-						// If this is the last threads
-						// Signal the thread manager that the main thread can continue.
-						*info->jobsDone = true;
-						info->releaseMainThread->signal();
+					case THREAD_DONE: {
+						done = true;
+						break;
 					}
-					break;
-				}
-
-				case THREAD_DONE: {
-					done = true;
-					break;
-				}
-				default:
-					break;
+					default:
+						break;
 				}
 			} while (!done);
 			info->state = THREAD_DEAD;
@@ -279,6 +272,7 @@ namespace a7az0th {
 				for (int i = 0; i < numThreads; i++) {
 					if (info[i].state != THREAD_IDLE) {
 						good = false;
+						break;
 					}
 				}
 				if (good) break;

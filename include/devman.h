@@ -62,6 +62,10 @@ private:
 };
 
 
+struct CompileOptions {
+	int maxThreads;
+};
+
 // A containter for CUDA device information
 struct Device {
 	friend struct DeviceManager;
@@ -71,7 +75,8 @@ struct Device {
 		emulate(emulate),
 		handle(-1),
 		context(nullptr),
-		program(nullptr)
+		program(nullptr),
+		maxThreads(1024)
 	{
 	}
 
@@ -94,7 +99,7 @@ struct Device {
 
 	std::string getInfo() const; // Produce a string out of the contained device info and return it
 
-	CUresult setSource(const std::string& ptxFile);
+	CUresult setSource(const std::string& ptxFile, const CompileOptions &options);
 
 	//Return true if the device is emulating a CUDA device
 	int isEmulator() const { return emulate; }
@@ -164,6 +169,7 @@ struct Device {
 		assert(err == CUDA_SUCCESS);
 	}
 
+	int getMaxThreads() const { return maxThreads; }
 private:
 	//Set emulation mode for this device. Valid to be called only during initialization
 	void setEmulation(int val) { emulate = val; }
@@ -171,7 +177,8 @@ private:
 	CUdevice handle;   //< Handle to the CUDA device
 	CUcontext context; //< Handle to the CUDA context associated with this device
 	CUmodule program;  //< Handle to the compiled program
-	int emulate;
+	int maxThreads; //< Maximum number of threads allowed per block
+	bool emulate; //< True when this device is not a real GPU but just a CPU emulator
 };
 
 enum class DeviceError {
@@ -195,6 +202,9 @@ struct DeviceManager {
 		return instance;
 	}
 
+	// Frees all resources held by the instance
+	int deinit();
+
 	// Destructor. Should call deinit();
 	~DeviceManager();
 
@@ -212,8 +222,6 @@ private:
 	// Queries the system for GPU devices, sets the numDevices member accordingly, populates the devices list
 	// @returns 0 on success 
 	int init(int emulation);
-	// Frees all resources held by the instance
-	int deinit();
 
 	// Check whether the GPU manager has successfully been initialized.
 	// returns 1 if the init() method has already been called
@@ -233,13 +241,16 @@ struct Kernel {
 	friend struct ThreadData;
 	// @param name The name of the program entry point
 	// @param program The device module handle that was obtained from compiling the GPU code
-	Kernel(std::string name, CUmodule program);
+	Kernel(const std::string &name, CUmodule program);
 	~Kernel();
 
 	// Add a pointer parameter to the kernel execution
 	void addParamPtr(const void* ptr);
 	// Add an integer parameter to the kernel execution
 	void addParamInt(int i);
+
+	// 
+	void reset();
 
 	// Get a handle to the kernel function. Passed to cuLaunchKernel
 	CUfunction handle() { return function; }
@@ -265,7 +276,7 @@ struct ThreadData {
 	// @param workSize The size of the job (how many threads to launch)
 	CUresult launch(const Kernel& kernel, const int workSize);
 	// Wait for the kernel launch to finish
-	void wait() const;
+	int wait() const;
 
 	// Frees all resources owned. Safe to be called multile times
 	void freeMem();

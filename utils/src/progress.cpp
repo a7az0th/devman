@@ -1,6 +1,16 @@
 #include "progress.h"
 #include <chrono>
 
+#define ANSI_COLOR_RED     "\x1b[31m"
+#define ANSI_COLOR_GREEN   "\x1b[32m"
+#define ANSI_COLOR_YELLOW  "\x1b[33m"
+#define ANSI_COLOR_BLUE    "\x1b[34m"
+#define ANSI_COLOR_MAGENTA "\x1b[35m"
+#define ANSI_COLOR_CYAN    "\x1b[36m"
+#define ANSI_COLOR_RESET   "\x1b[0m"
+
+using namespace a7az0th;
+
 std::string ProgressCallback::getTimestamp() {
 
 	auto now = std::chrono::system_clock::now();
@@ -30,8 +40,8 @@ void ProgressCallback::setLogLevel(LogLevel loggingLevel) {
 	this->logLevel = loggingLevel;
 }
 
-ProgressCallback::ProgressCallback(): 
-	logLevel(LogLevel::info) 
+ProgressCallback::ProgressCallback():
+	logLevel(LogLevel::info)
 {
 	//blank
 }
@@ -42,61 +52,61 @@ ProgressCallback::ProgressCallback(LogLevel logLevel):
 	//blank
 }
 
-void ProgressCallback::debug(const char *format, ...) {
-	va_list args;
-	va_start(args, format);
+void ProgressCallback::debug(const char *format, ...) const {
 
 	if(logLevel >= LogLevel::debug) {
-		std::string timeStamp = ProgressCallback::getTimestamp();
-		printf("[%s][DEBUG] ", timeStamp.c_str());
-		vprintf(format, args);
-		printf("\n");
-	}
+		va_list args;
+		va_start(args, format);
 
-	va_end(args);
+		std::string timeStamp = ProgressCallback::getTimestamp();
+		fprintf(stderr, "[%s]" ANSI_COLOR_MAGENTA "[  DEBUG] ", timeStamp.c_str());
+		vfprintf(stderr, format, args);
+		fprintf(stderr, ANSI_COLOR_RESET "\n");
+
+		va_end(args);
+	}
 }
 
-void ProgressCallback::info(const char *format, ...) {
-	va_list args;
-	va_start(args, format);
-
+void ProgressCallback::info(const char *format, ...) const {
 	if(logLevel >= LogLevel::info) {
-		std::string timeStamp = ProgressCallback::getTimestamp();
-		printf("[%s][INFO] ", timeStamp.c_str());
-		vprintf(format, args);
-		printf("\n");
-	}
+		va_list args;
+		va_start(args, format);
 
-	va_end(args);
+		std::string timeStamp = ProgressCallback::getTimestamp();
+		fprintf(stderr, "[%s]"  "[   INFO] ", timeStamp.c_str());
+		vfprintf(stderr, format, args);
+		fprintf(stderr,  "\n");
+
+		va_end(args);
+	}
 }
 
-void ProgressCallback::error(const char *format, ...) {
-	va_list args;
-	va_start(args, format);
-
+void ProgressCallback::error(const char *format, ...) const {
 	if(logLevel >= LogLevel::error) {
-		std::string timeStamp = ProgressCallback::getTimestamp();
-		printf("[%s][ERROR] ", timeStamp.c_str());
-		vprintf(format, args);
-		printf("\n");
-	}
+		va_list args;
+		va_start(args, format);
 
-	va_end(args);
+		std::string timeStamp = ProgressCallback::getTimestamp();
+		fprintf(stderr, "[%s]" ANSI_COLOR_RED "[  ERROR] ", timeStamp.c_str());
+		vfprintf(stderr, format, args);
+		fprintf(stderr, ANSI_COLOR_RESET "\n");
+
+		va_end(args);
+	}
 }
 
-void ProgressCallback::warning(const char *format, ...) {
-	va_list args;
-	va_start(args, format);
-
+void ProgressCallback::warning(const char *format, ...) const {
 	if(logLevel >= LogLevel::warning) {
+		va_list args;
+		va_start(args, format);
+
 		std::string timeStamp = ProgressCallback::getTimestamp();
-		printf("[%s][WARNING] ", timeStamp.c_str());
-		vprintf(format, args);
-		printf("\n");
+		fprintf(stderr, "[%s]" ANSI_COLOR_YELLOW "[WARNING] ", timeStamp.c_str());
+		vfprintf(stderr, format, args);
+		fprintf(stderr, ANSI_COLOR_RESET "\n");
+
+		va_end(args);
 	}
-
-	va_end(args);
-
 }
 
 ProgressCallback::~ProgressCallback() {
