@@ -1,13 +1,16 @@
 #include <assert.h>
 #include <algorithm>
 #include <string.h> //for memcpy
-#include "FreeImage.h"
 #include "image.h"
 #include "threadman.h"
 #include "timer.h"
 
 typedef unsigned long long uint64;
 
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image/stb_image.h"
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "stb_image/stb_image_write.h"
 
 template<typename T>
 inline T clamp(const T& val, const T& minVal, const T& maxVal) { return std::min(std::max(val, minVal), maxVal); }
@@ -149,143 +152,31 @@ int Image::load(const std::string & fileName) {
 const float scalar = 1.f / 255.f;
 
 int Image::loadFromFile(const std::string & fileName) {
-	FREE_IMAGE_FORMAT fif = FreeImage_GetFIFFromFilename(fileName.c_str());
-	FIBITMAP *dib = FreeImage_Load(fif, fileName.c_str());
-	BYTE *bits    = FreeImage_GetBits(dib);
-	valid = 0;
-	if (!dib || !bits) {
-		FreeImage_Unload(dib);
-		return -1;
+	int channels;
+	unsigned char *img = stbi_load(fileName.c_str(), &width, &height, &channels, 0);
+
+	for (int i = 0; i < width*height; i++) {
+		Color col;
+		if (channels == 1) {
+			col.f.f[0] = img[i];
+		} else if (channels == 3) {
+			col.f.f[0] = img[3*i+0];
+			col.f.f[1] = img[3*i+1];
+			col.f.f[2] = img[3*i+2];
+		} else {
+			assert(false);
+		}
+		data[i] = col;
 	}
 
-	BITMAPINFO *info = FreeImage_GetInfo(dib);
-
-	unsigned bpp = info->bmiHeader.biBitCount;
-	height       = info->bmiHeader.biHeight;
-	width        = info->bmiHeader.biWidth;
-	data = new Color[width*height];
-	colorSize = sizeof(Color);
-	if (bpp == 96) {
-		for (int i = 0; i < height; i++) {
-			BYTE* line = FreeImage_GetScanLine(dib, i);
-			FIRGBF * c = (FIRGBF*) line;
-			for (int j = 0; j < width; j++) {
-				Color col(c->red, c->green, c->blue);
-				
-				const float intens = col.intensity();
-				if (minValue.intensity() > intens) {
-					minValue = col;
-				}
-				if (maxValue.intensity() < intens) {
-					maxValue = col;
-				}
-				data[i*width + j] = col;
-				c++;
-			}
-		}
-	} else if (bpp == 24) {
-		for (int i = 0; i < height; i++) {
-			BYTE* line = FreeImage_GetScanLine(dib, i);
-			RGBTRIPLE * c = (RGBTRIPLE*) line;
-			for (int j = 0; j < width; j++) {
-				float r = c->rgbtRed   * scalar;
-				float g = c->rgbtGreen * scalar;
-				float b = c->rgbtBlue  * scalar;
-				data[i*width + j] = Color(r, g, b);
-				c++;
-			}
-		}
-	} else if (bpp == 32) {
-		for (int i = 0; i < height; i++) {
-			BYTE* line = FreeImage_GetScanLine(dib, i);
-			RGBQUAD * c = (RGBQUAD*) line;
-			for (int j = 0; j < width; j++) {
-				float r = c->rgbRed   * scalar;
-				float g = c->rgbGreen * scalar;
-				float b = c->rgbBlue  * scalar;
-				data[i*width + j] = Color(r, g, b);
-				c++;
-			}
-		}
-	} else if (bpp == 8) {
-
-		for (int i = 0; i < height; i++) {
-			BYTE* line = FreeImage_GetScanLine(dib, i);
-			for (int j = 0; j < width; j++) {
-				float r = (*line) * scalar;
-				float g = (*line) * scalar;
-				float b = (*line) * scalar;
-				data[i*width + j] = Color(r, g, b);
-				line++;
-			}
-		}
-	} else {
-		FreeImage_Unload(dib);
-		return 1;
-	}
-	FreeImage_Unload(dib);
+	stbi_image_free(img);  
 	valid = 1;
 	return 0;
 }
 
-struct B : a7az0th::MultiThreadedFor {
-	B(const char* data, RGBTRIPLE *pixel_data, int width, int height, int jobSize, int stride): buff(data), pixel_data(pixel_data), width(width), height(height), stride(stride), jobSize(jobSize) {
-	}
-	virtual void body(int index, int threadIdx, int numThreads) override {
-		for (int a = 0; a < jobSize; a++) {
-			const int lineIdx = index*jobSize + a;
-			if (lineIdx >= height) {
-				return;
-			}
-
-			for (int i = 0; i < width; i++) {
-				const int offset = lineIdx*width+i;
-				const Color& col = *reinterpret_cast<const Color*>(buff + offset*stride);
-				pixel_data[offset].rgbtRed   = static_cast<BYTE>(clamp(col.f.f[0], 0.0f, 1.0f) * 255.f);
-				pixel_data[offset].rgbtGreen = static_cast<BYTE>(clamp(col.f.f[1], 0.0f, 1.0f) * 255.f);
-				pixel_data[offset].rgbtBlue  = static_cast<BYTE>(clamp(col.f.f[2], 0.0f, 1.0f) * 255.f);
-			}
-		}
-	}
-private:
-	int jobSize;
-	int width;
-	int height;
-	int stride;
-	RGBTRIPLE *pixel_data;
-	const char *buff;
-};
 
 int Image::save(const std::string &fileName, a7az0th::ThreadManager *threadman) const {
-	FIBITMAP *dib = FreeImage_Allocate(width, height, 24);
-	RGBTRIPLE *pixel_data = (RGBTRIPLE*)FreeImage_GetBits(dib);
-	if (!dib || !pixel_data) {
-		FreeImage_Unload(dib);
-		return -1;
-	}
-	const char* buffStart = reinterpret_cast<char*>(data);
 
-	a7az0th::Timer elapsed;
-	if (threadman) {
-
-		const int numThreads = a7az0th::getProcessorCount();
-		const int jobSize = (height + numThreads - 1) / numThreads;
-		B b(buffStart, pixel_data, width, height, jobSize, colorSize);
-		b.run(*threadman, jobSize, numThreads);
-	} else {
-		for (int i = 0; i < height*width; i++) {
-			const Color& col = *reinterpret_cast<const Color*>(buffStart + i*colorSize);
-			pixel_data->rgbtRed   = static_cast<BYTE>(clamp(col.f.f[0], 0.0f, 1.0f) * 255.f);
-			pixel_data->rgbtGreen = static_cast<BYTE>(clamp(col.f.f[1], 0.0f, 1.0f) * 255.f);
-			pixel_data->rgbtBlue  = static_cast<BYTE>(clamp(col.f.f[2], 0.0f, 1.0f) * 255.f);
-			pixel_data++;
-		}
-	}
-	a7az0th::int64 elapsedTime = elapsed.elapsed(a7az0th::Timer::Precision::Milliseconds);
-	printf("Image conversion took %lld ms\n", elapsedTime);
-
-	FreeImage_Save(FIF_JPEG, dib, fileName.c_str());
-	FreeImage_Unload(dib);
 	return 0;
 }
 

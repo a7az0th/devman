@@ -10,7 +10,7 @@ function(BUILD_PTX name)
 	if (WIN32)
 		set(NVCC "$ENV{CUDA_PATH}/bin/nvcc.exe")
 	else()
-		set(NVCC "/usr/local/cuda/bin/nvcc")
+		set(NVCC "$ENV{CUDA_PATH}/bin/nvcc")
 	endif()
 
 	set(NVCC_FLAGS

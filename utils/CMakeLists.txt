@@ -29,15 +29,5 @@ set(SOURCES
 
 add_library(${PROJECT_NAME} STATIC ${HEADERS} ${SOURCES})
 
-if (WIN32)
-    include_directories(
-        ${PROJECT_SOURCE_DIR}/sdk/FreeImage/include
-    )
-    link_directories (
-        ${PROJECT_SOURCE_DIR}/sdk/FreeImage/lib
-    )
-    install(FILES ${PROJECT_SOURCE_DIR}/sdk/FreeImage/bin/FreeImage.dll DESTINATION ${INSTALL_PATH})
-endif()
-
 set(UTILS_HEADERS ${HEADERS})
 
